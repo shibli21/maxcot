@@ -8,7 +8,7 @@ line, hatch and halftone dot is generated on a 2D canvas, in the browser or in N
 npm install maxcot      # or: bun add maxcot
 ```
 
-Strict TypeScript, ES modules, zero runtime dependencies. Four entry points:
+Strict TypeScript, ES modules, zero runtime dependencies. Five entry points:
 
 | Import | What it gives you |
 |---|---|
@@ -16,6 +16,7 @@ Strict TypeScript, ES modules, zero runtime dependencies. Four entry points:
 | `maxcot/skins` | the 26 skins as plain objects, plus `allSkins` and `skinsByName` |
 | `maxcot/film` | `Player` (shots, beats, who/style tracks, cameras), a DOM timeline `Editor`, `card` |
 | `maxcot/score` | `createConductor`: sequence anything in bars and beats, with exact seeking |
+| `maxcot/voice` | lip-sync from sound: a live `Voice` (microphone or file), offline `lipTrack`, a `babble` test voice |
 
 ## A character on a canvas
 
@@ -68,6 +69,35 @@ under a point.
 - **Actors** (`CAST`) are just overrides of the design table: `max`, `child`, `girl`, `boss`, `clerk`, `teen`, `professor`, `oldman`, `grandma`. Add your own with `cast(key, label, about, values)`.
 - **Manner**: each actor also moves like itself. `weight` sets its springs (the boss is heavy and settles slowly, the child is light and springy), `idle` is a habit (`still`, `fidget`, `bouncy`, `sway`), `gaze` is where its eyes wander (`steady`, `away`, `darting`, `us`), and `rest` is the pose it falls back to. Recasting swaps the manner too; change it with `actor.setManner({ weight: 0.9, idle: 'sway' })`.
 - **Dials** (`DESIGN`): one row per dial, `[key, group, label, help, min, max, default, options?]`. Body size, taper, corners and a curl on top; eye kind (white, dot, button, ring), shape, bow, flat top, taper, iris, lids and lashes; brow kind (tapered, line, bar, none), weight and arch; mouth width, tip and lip roll; teeth kind (band, separate, fangs, gap); hands; view angle. Dials with `options` pick a kind and switch outright instead of morphing.
+
+## Lip-sync
+
+`maxcot/voice` turns sound into a mouth. Loudness opens it, and a rough read of the
+spectrum shapes it: a low first formant keeps it half shut (i, u), a high second formant
+pulls it wide (e, i), nothing above 1 kHz rounds it (o, u), and hiss shows the teeth.
+It is a vowel guess, not speech recognition, and it needs no dependencies. Nothing leaves the page.
+
+```ts
+import { createVoice } from 'maxcot/voice';
+
+const voice = createVoice({ target: actor });     // any Actor
+await voice.microphone();                         // or: await voice.file(file), voice.samples(data, rate)
+function tick(dt: number) { voice.update(dt); /* then draw as usual */ }
+```
+
+For rendering offline, or to keep it frame-exact, analyse the samples up front and look the
+mouth up by time:
+
+```ts
+import { babble, lipTrack, lipsAt, pitchOf } from 'maxcot/voice';
+
+const sound = babble({ seconds: 2, pitch: pitchOf('grandma'), seed: 3 }); // or your own decoded samples
+const track = lipTrack(sound, 22050, 60);
+actor.lips = lipsAt(track, 60, t);                // null lets go of the mouth again
+```
+
+`actor.lips` only opens the mouth further and reshapes it while there is sound, so a smile or
+a sneer underneath still shows.
 
 ## Sequencing with a score
 

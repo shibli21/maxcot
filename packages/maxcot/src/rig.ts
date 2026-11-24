@@ -6,7 +6,7 @@
 // any other with no in-betweens authored by hand.
 import K from './kit.js';
 import * as Design from './design.js';
-import type { Channels, DesignValues, Discrete, Frame } from './types.js';
+import type { Channels, DesignValues, Discrete, Frame, Lips } from './types.js';
 import type { Manner } from './design.js';
 
 /** Channel targets and discrete switches (hand shapes, eye mode, prop) by key. */
@@ -230,6 +230,8 @@ export class Actor {
   morph = 7;
   /** How this actor moves on its own: weight, idle habit, gaze habit, rest pose. */
   manner!: Manner;
+  /** Lip-sync from sound (see maxcot/voice). While set and loud, it shapes the mouth over whatever pose is on. */
+  lips: Lips | null = null;
 
   constructor(o: ActorOptions = {}) {
     this.who = o.who || 'max';
@@ -314,6 +316,16 @@ export class Actor {
       C['eyes.open.L'] = c('eyes.open.L') * b; C['eyes.open.R'] = c('eyes.open.R') * b;
     }
     if (this.gaze === 'us') { C['eyes.lookX'] = c('eyes.lookX') * 0.2; C['eyes.lookY'] = c('eyes.lookY') * 0.2; }
+    // speech: the voice opens the mouth at least this far and shapes it while there is sound
+    var L = this.lips;
+    if (L && L.level > 0.001) {
+      var sw = K.clamp(L.level * 4, 0, 1);
+      C['mouth.open'] = Math.max(c('mouth.open'), L.open * 1.1);
+      C['mouth.round'] = c('mouth.round') + (L.round - c('mouth.round')) * sw;
+      C['mouth.wide'] = c('mouth.wide') + (L.wide - c('mouth.wide')) * sw;
+      C['mouth.teeth'] = Math.max(c('mouth.teeth'), L.teeth);
+      C.nod = c('nod') + L.level * 0.025 * Math.sin(t * 7);
+    }
     return { P: P, C: C, D: this.disc, t: t, who: this.who };
   }
 }

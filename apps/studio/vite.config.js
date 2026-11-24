@@ -9,7 +9,7 @@ export default defineConfig({
   resolve: {
     alias: [
       { find: /^maxcot$/, replacement: lib('index.ts') },
-      { find: /^maxcot\/(skins|film|score)$/, replacement: lib('$1/index.ts') }
+      { find: /^maxcot\/(skins|film|score|voice)$/, replacement: lib('$1/index.ts') }
     ]
   },
   build: {

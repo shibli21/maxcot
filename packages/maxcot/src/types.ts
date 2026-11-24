@@ -59,6 +59,9 @@ export type DesignValues = Record<string, number>;
 export type Channels = Record<string, number>;
 export interface Discrete { handL: string; handR: string; eyeMode: string; prop: string; [k: string]: string }
 
+/** A mouth shape heard in sound (see maxcot/voice): how open, round and wide, teeth showing, and how loud. */
+export interface Lips { open: number; round: number; wide: number; teeth: number; level: number }
+
 /** Everything needed to draw one moment of one actor. */
 export interface Frame { P: DesignValues; C: Channels; D: Discrete; t: number; who: string }
 

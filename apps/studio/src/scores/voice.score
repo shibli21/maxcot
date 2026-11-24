@@ -1,0 +1,46 @@
+// voice.score: small talk. `talk` babbles in an actor's own voice and the
+// mouth follows the sound, read off the spectrum the same way the Voice tab
+// reads your microphone. Open that tab to speak for Max yourself.
+{
+  title: 'Small talk',
+  bpm: 96,
+  tail: 3,
+  events: [
+    { at: [1, 1], create: 'max' },
+    { at: [1, 1], style: 'felttip' },
+    { at: [1, 2], enter: { id: 'gran', who: 'grandma' } },
+    { at: [1, 3], look: 'gran' },
+    { at: [1, 3], look: 'max', on: 'gran' },
+    { at: [1, 4], open: 'Voice' },
+    // Max opens
+    { at: [2, 1], shot: 'medium', on: 'max' },
+    { at: [2, 1], pose: 'present' },
+    { at: [2, 1], talk: 2.2 },
+    { at: [2, 4], pose: 'pleased' },
+    // gran is not convinced
+    { at: [3, 1], shot: 'close', on: 'gran' },
+    { at: [3, 1], pose: 'eyes-suspicious', on: 'gran' },
+    { at: [3, 2], talk: { len: 1.8, vowels: 'ouoa' }, on: 'gran' },
+    { at: [3, 4], pose: 'point-you', on: 'gran' },
+    // Max talks faster
+    { at: [4, 1], shot: 'close', on: 'max' },
+    { at: [4, 1], pose: 'feel-embarrassed' },
+    { at: [4, 1], talk: { len: 1.5, pitch: 1.25, seed: 9 } },
+    { at: [4, 3], pose: 'shrug' },
+    { at: [4, 3], talk: { len: 1, pitch: 1.35, vowels: 'iie' } },
+    // both at once
+    { at: [5, 1], shot: 'wide' },
+    { at: [5, 1], style: 'riso' },
+    { at: [5, 1], pose: 'feel-laughing', on: 'gran' },
+    { at: [5, 1], talk: { len: 2, vowels: 'aaoa' }, on: 'gran' },
+    { at: [5, 2], pose: 'feel-happy' },
+    { at: [5, 2], talk: { len: 1.6, seed: 4 } },
+    { at: [6, 1], look: 'us' },
+    { at: [6, 1], look: 'us', on: 'gran' },
+    { at: [6, 2], pose: 'wave' },
+    { at: [6, 2], pose: 'wave', on: 'gran' },
+    { at: [6, 2], talk: 1.2 },
+    { at: [6, 3], talk: 1, on: 'gran' },
+    { at: [7, 1], end: { card: 'logo', text: 'SMALL TALK' } }
+  ]
+}

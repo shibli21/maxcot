@@ -92,7 +92,12 @@ the panels edit it. Each actor also has a **manner** (how heavy it is, its idle 
 its eyes wander, its rest pose), shown in the Motion panel and set from a score with
 `{ manner: { weight: 0.2, idle: 'bouncy' }, on: 'boss' }`.
 
-Each verb (`create`, `enter`, `exit`, `shot`, `look`, `style`, `pose`, `who`, `set`, `play`, `camera`, `end` and the rest) is
+Characters can **talk**. `{ at: [2, 1], talk: 2, on: 'gran' }` babbles for two seconds in that
+actor's own voice, and the mouth follows the sound (**Demos → Small talk**). The **Voice** tab
+lip-syncs the selected actor to your microphone, an audio file or a test voice. The sound is
+analysed on the page and never recorded or sent anywhere.
+
+Each verb (`create`, `enter`, `exit`, `shot`, `look`, `style`, `pose`, `who`, `set`, `talk`, `play`, `camera`, `end` and the rest) is
 one function in the studio's `CMD` table, and the UI calls the same functions, so anything
 the score can do, you can do by hand.
 

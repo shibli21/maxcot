@@ -21,6 +21,10 @@
     "./score": {
       "types": "./dist/score/index.d.ts",
       "default": "./dist/score/index.js"
+    },
+    "./voice": {
+      "types": "./dist/voice/index.d.ts",
+      "default": "./dist/voice/index.js"
     }
   },
   "files": [

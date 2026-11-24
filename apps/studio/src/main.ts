@@ -6,6 +6,7 @@ import { kit as K, Actor, Character, Stage, CAST, DESIGN, POSES, POSE_SECTIONS, 
 import { GROUPS, allSkins, skinsByName } from 'maxcot/skins';
 import { Editor, Player, card, type Film, type StyleSegment, type TrackName, type WhoSegment } from 'maxcot/film';
 import { createConductor, parseScore, type CommandContext, type Conductor, type ScheduledEvent, type ScoreEvent } from 'maxcot/score';
+import { Voice, babble, lipTrack, lipsAt, pitchOf, type Lips } from 'maxcot/voice';
 import hello from './hello';
 import Beat from './beat';
 import { decodeShare, encodeShare, fileName, makeProject, readProject, type Project } from './project';
@@ -19,13 +20,14 @@ import printSrc from '../../../packages/maxcot/src/skins/print.ts?raw';
 import screensSrc from '../../../packages/maxcot/src/skins/screens.ts?raw';
 import glitchSrc from '../../../packages/maxcot/src/skins/glitch.ts?raw';
 import filmSrc from '../../../packages/maxcot/src/film/film.ts?raw';
+import voiceSrc from '../../../packages/maxcot/src/voice/analyze.ts?raw';
 import tourScoreRaw from './scores/tour.score?raw';
 import mainSrc from './main.ts?raw';
 // textareas normalise line endings, so compare against the same form
 const tourScore = tourScoreRaw.replace(/\r\n?/g, '\n');
 
 type Mode = 'single' | 'sizes' | 'sheet' | 'deal' | 'faces' | 'aspects' | 'film' | 'card';
-type Panel = 'Styles' | 'Tune' | 'Poses' | 'Design' | 'Motion';
+type Panel = 'Styles' | 'Tune' | 'Poses' | 'Design' | 'Motion' | 'Voice';
 interface StudioState {
   actor: Actor; style: string; palette: string; guides: boolean; mode: Mode;
   sizesUpTo: number; grid: number; sheetKind: string; dealSeed: number; faces: number;
@@ -62,6 +64,31 @@ let tiles: Tile[] = [], tilesSig = '';
 let thumbQ: Array<[HTMLCanvasElement, ThumbSpec]> = [], thumbId = 0;
 let bts: Conductor;
 const stage = new Stage($<HTMLCanvasElement>('#main'), { skin: skin('pencil'), key: 'main', autoplay: false });
+// lip-sync: one live voice (microphone or a file) and any number of scored `talk` lines
+const voice = new Voice();
+const TALK_SR = 22050, TALK_FPS = 60;
+interface Talk { start: number; len: number; track: Lips[] }
+const talks = new Map<Actor, Talk>();
+let talkAudio: AudioContext | null = null, talkNodes: AudioBufferSourceNode[] = [];
+function sayOutLoud(samples: Float32Array, offset: number): void {
+  try {
+    if (!talkAudio) talkAudio = new AudioContext();
+    if (talkAudio.state === 'suspended') void talkAudio.resume();
+    const b = talkAudio.createBuffer(1, samples.length, TALK_SR); b.getChannelData(0).set(samples);
+    const s = talkAudio.createBufferSource(); s.buffer = b; const g = talkAudio.createGain(); g.gain.value = 0.55;
+    s.connect(g); g.connect(talkAudio.destination); s.start(0, Math.max(0, offset));
+    s.onended = () => { talkNodes = talkNodes.filter((n) => n !== s); }; talkNodes.push(s);
+  } catch { /* no audio here: the mouth still moves */ }
+}
+function hush(): void { talkNodes.forEach((n) => { try { n.stop(); } catch { /* done */ } }); talkNodes = []; }
+function updateTalks(): void {
+  if (talkNodes.length && !bts.playing) hush();
+  talks.forEach((k, a) => {
+    const t = bts.songT - k.start;
+    if (t < 0 || t > k.len + 0.25) { talks.delete(a); if (voice.target !== a) a.lips = null; return; }
+    if (voice.target !== a || !voice.active) a.lips = lipsAt(k.track, TALK_FPS, t);
+  });
+}
 function useStageSkin(name: string): void { if (stage.skin.name !== name) { stage.skin = skin(name); stage.dirty = true; } }
 
 /** Switch a character's skin by name, redrawing only when it really changes. */
@@ -76,6 +103,7 @@ function reset(): void {
     lead: 'max', selected: 'max'
   };
   castOnly('max', ST.actor); K.tune = {};
+  talks.clear(); hush(); if (voice.active) voice.attach(ST.actor);
   film = null; editor = null; $('#timeline').innerHTML = ''; $('#pointer').style.display = 'none';
   $('#panel').classList.remove('on'); setMode('single');
 }
@@ -102,6 +130,7 @@ function actorFor(ev: Record<string, unknown>): Actor {
 function selectActor(id: string): void {
   if (!stage.has(id)) return;
   ST.selected = id; ST.actor = stage.get(id); bump();
+  if (voice.active) voice.attach(ST.actor);
   if (ST.panel) openPanel(ST.panel);
 }
 
@@ -121,6 +150,14 @@ const CMD: Record<string, Command> = {
   shot(v, ev) { stage.shot(str(v) as StageFraming, ev.on as string | string[] | undefined, !!ev.cut); leaveSpecial(); src('stage'); },
   place(v, ev) { const id = ev.on != null ? String(ev.on) : ST.lead, at = Array.isArray(v) ? v : [v]; if (stage.has(id)) stage.place(id, num(at[0]), at[1] != null ? num(at[1]) : undefined); src('stage'); },
   spread() { stage.spread(); src('stage'); },
+  talk(v, ev, ctx) {
+    const o = (typeof v === 'number' ? { len: v } : (v || {})) as { len?: number; pitch?: number; seed?: number; vowels?: string };
+    const a = actorFor(ev), len = K.clamp(Number(o.len ?? 2) || 2, 0.1, 30);
+    const samples = babble({ seconds: len, sampleRate: TALK_SR, pitch: pitchOf(a.who) * (Number(o.pitch) || 1), seed: o.seed ?? (ev.i ?? 0) + 1, vowels: o.vowels });
+    talks.set(a, { start: ctx.now - ctx.since, len, track: lipTrack(samples, TALK_SR, TALK_FPS) });
+    if (!ctx.instant && beat.on && !CAPTURE) sayOutLoud(samples, ctx.since);
+    src('voice');
+  },
   manner(v, ev) { actorFor(ev).setManner((v || {}) as Partial<Manner>); stage.dirty = true; if (ST.panel === 'Motion' && !ST.instant) openPanel('Motion'); src('manner'); },
   style(v, ev) {
     const name = str(v), palette = ev.palette as string | undefined;
@@ -307,12 +344,33 @@ function renderThumb(c: HTMLCanvasElement, s: ThumbSpec): void {
 }
 
 // ── panel ────────────────────────────────────────────────────────────────
-const TABS: Panel[] = ['Styles', 'Tune', 'Poses', 'Design', 'Motion'];
+const TABS: Panel[] = ['Styles', 'Tune', 'Poses', 'Design', 'Motion', 'Voice'];
 function openPanel(name: Panel): void {
   ST.panel = name; $('#panel').classList.toggle('on', ST.mode === 'single');
   const tabs = $('#tabs'); tabs.innerHTML = '';
   TABS.forEach((t) => { const b = el('button', t === name ? 'on' : '', t); b.onclick = () => openPanel(t); tabs.appendChild(b); });
   buildPanel(); layout();
+}
+function voiceStatus(): string {
+  return voice.source === 'microphone' ? 'Listening to the microphone. Speak, sing or play something.'
+    : voice.source === 'file' ? 'Playing ' + (voiceName || 'a clip') + '.' : 'Pick a sound to drive the mouth.';
+}
+let voiceName = '';
+async function startVoice(kind: 'microphone' | 'test' | 'file', f?: File): Promise<void> {
+  voice.attach(ST.actor);
+  try {
+    if (kind === 'microphone') await voice.microphone();
+    else if (kind === 'file' && f) { voiceName = f.name; await voice.file(f); }
+    else { voiceName = 'the test voice'; voice.samples(babble({ seconds: 6, sampleRate: TALK_SR, pitch: pitchOf(ST.actor.who), seed: 7 }), TALK_SR); }
+  } catch (e) {
+    toast(kind === 'microphone' ? 'No microphone: ' + ((e as Error).message || 'permission was refused') : 'Could not play that file: ' + ((e as Error).message || 'unknown format'));
+  }
+  if (ST.panel === 'Voice') buildPanel();
+}
+voice.onended = () => { if (ST.panel === 'Voice') buildPanel(); };
+function updateMeter(): void {
+  if (ST.panel !== 'Voice') return;
+  const bar = document.querySelector<HTMLElement>('#panelBody .meter i'); if (bar) bar.style.width = Math.round(voice.lips.level * 100) + '%';
 }
 function closePanel(): void { ST.panel = null; $('#panel').classList.remove('on'); layout(); }
 function section(body: HTMLElement, title: string): HTMLDivElement { body.appendChild(el('h4', null, title)); const g = el('div', 'thumbs'); body.appendChild(g); return g; }
@@ -381,6 +439,23 @@ function buildPanel(): void {
     dial(body, 'm:damp', 'Damping', 0.2, 1.2, a.damp, '', (v) => { a.damp = v; });
     dial(body, 'm:idle', 'Idle life', 0, 2, a.idle, '', (v) => { a.idle = v; });
     dial(body, 'm:morph', 'Recast speed', 1, 20, a.morph, '', (v) => { a.morph = v; });
+  } else if (ST.panel === 'Voice') {
+    body.appendChild(el('h4', null, 'Lip-sync for ' + ST.selected));
+    body.appendChild(el('p', 'note', 'The mouth follows the sound: loudness opens it, the vowel shapes it. The sound is read right here on the page; nothing is recorded or sent anywhere.'));
+    const row = el('div', 'vbtns');
+    const btn = (label: string, k: string, fn: () => void) => { const b = el('button', voice.source === k ? 'on' : '', label); b.dataset.k = 'voice:' + k; b.onclick = fn; row.appendChild(b); };
+    btn('Microphone', 'microphone', () => { void startVoice('microphone'); });
+    btn('Audio file…', 'file', () => $<HTMLInputElement>('#voiceFile').click());
+    btn('Test voice', 'test', () => { void startVoice('test'); });
+    btn('Stop', 'none', () => { voice.stop(); buildPanel(); });
+    body.appendChild(row);
+    const meter = el('div', 'meter'); meter.appendChild(el('i')); body.appendChild(meter);
+    body.appendChild(el('p', 'note voiceStatus', voiceStatus()));
+    dial(body, 'v:gate', 'Sensitivity', 20, 70, -voice.gate, 'Higher hears quieter sound', (v) => { voice.gate = -v; });
+    dial(body, 'v:range', 'Mouth range', 10, 50, voice.range, 'Lower opens the mouth fully at a lower volume', (v) => { voice.range = v; });
+    toggle(body, 'Play files out loud', voice.monitor, (on) => { voice.monitor = on; });
+    body.appendChild(el('h4', null, 'In a score'));
+    body.appendChild(el('p', 'note', "{ at: [2, 1], talk: 2, on: 'kid' } babbles for two seconds in that actor's own voice, and the mouth follows it. talk: { len: 2, pitch: 1.2, vowels: 'aoi' } tunes it."));
   }
   body.scrollTop = scroll;
 }
@@ -485,7 +560,7 @@ function nearest(word: string, names: Iterable<string>): string | null {
 const KNOWN: Record<string, Set<string>> = {
   pose: new Set(Object.keys(POSES)), style: new Set(Object.keys(SKINS)),
   who: new Set(Object.keys(CAST)), preset: new Set(Object.keys(CAST)), create: new Set(Object.keys(CAST)),
-  set: new Set(DESIGN.map((r) => r[0])), open: new Set(['Styles', 'Tune', 'Poses', 'Design', 'Motion']),
+  set: new Set(DESIGN.map((r) => r[0])), open: new Set(['Styles', 'Tune', 'Poses', 'Design', 'Motion', 'Voice']),
   edit: new Set(['Who plays it', 'Style']), shot: new Set(['wide', 'full', 'medium', 'close'])
 };
 const PALETTES = new Set((skin('hologram').palettes || []).map((p) => p.name));
@@ -514,6 +589,16 @@ function validate(events: ScoreEvent[], lines: number[]): Mark[] {
       }
     }
     if (e.palette != null && !PALETTES.has(String(e.palette))) out.push({ line, level: 'warn', message: "no palette called '" + e.palette + "'" });
+    if (e.talk != null) {
+      const t = e.talk as Record<string, unknown>;
+      if (typeof t === 'number') { if (t <= 0 || t > 30) out.push({ line, level: 'warn', message: 'talk is a length in seconds, up to 30' }); }
+      else if (typeof t !== 'object' || Array.isArray(t)) out.push({ line, level: 'warn', message: "talk is seconds, or { len: 2, pitch: 1.2, vowels: 'aoi' }" });
+      else for (const key of Object.keys(t)) {
+        if (key === 'vowels') { if (typeof t.vowels !== 'string' || !/^[aeiou]+$/.test(t.vowels)) out.push({ line, level: 'warn', message: 'vowels are letters from a, e, i, o, u' }); }
+        else if (key === 'len' || key === 'pitch' || key === 'seed') { if (typeof t[key] !== 'number') out.push({ line, level: 'warn', message: key + ' is a number' }); }
+        else out.push({ line, level: 'warn', message: 'talk has len, pitch, seed and vowels; not `' + key + '`' });
+      }
+    }
     if (e.set != null && typeof e.to !== 'number') out.push({ line, level: 'warn', message: '`set` needs `to: <number>`' });
   });
   return out;
@@ -611,6 +696,7 @@ function initEditor(): void {
   $<HTMLInputElement>('#fileOpen').onchange = (e) => { const inp = e.target as HTMLInputElement, f = inp.files && inp.files[0]; if (f) void openFile(f); inp.value = ''; };
   $('#bSave').onclick = saveProject;
   $('#bShare').onclick = () => { void shareProject(); };
+  $<HTMLInputElement>('#voiceFile').onchange = (e) => { const inp = e.target as HTMLInputElement, f = inp.files && inp.files[0]; if (f) void startVoice('file', f); inp.value = ''; };
   // every .score file in scores/ is a demo
   const demos = import.meta.glob('./scores/*.score', { query: '?raw', import: 'default', eager: true }) as Record<string, string>;
   const pick = $<HTMLSelectElement>('#demo');
@@ -640,6 +726,7 @@ function showSource(kind: string, name?: string): void {
   if (kind === 'style') { const s = skin(n), f = SKIN_FILE[s.group]!; file = LIB + 'skins/' + f[0] + '.ts'; view = fileAt(f[1], 'Skins.' + s.name + ' = {'); }
   else if (kind === 'pose') { file = LIB + 'rig.ts'; view = fileAt(rigSrc, n.indexOf('feel-') === 0 ? "feel('" + n.slice(5) + "'" : "'" + n + "'"); }
   else if (kind === 'who') { file = LIB + 'design.ts'; view = fileAt(designSrc, "cast('" + n + "'"); }
+  else if (kind === 'voice') { file = LIB + 'voice/analyze.ts'; view = fileAt(voiceSrc, 'export function analyze'); }
   else if (kind === 'manner') { file = LIB + 'design.ts'; view = fileAt(designSrc, 'const MANNERS'); }
   else if (kind === 'set') { file = LIB + 'design.ts'; view = fileAt(designSrc, "['" + n + "'"); }
   else if (kind === 'film') {
@@ -717,6 +804,8 @@ function step(dt: number): void {
   ST.clock += dt;
   try {
     bts.tick(dt);
+    updateTalks();
+    if (voice.active) voice.update(dt);
     stage.members.forEach((m) => m.actor.update(dt));
     if (!stage.members.some((m) => m.actor === ST.actor)) ST.actor.update(dt);
     updatePointer();
@@ -737,6 +826,7 @@ function step(dt: number): void {
     for (let q = 0; q < (CAPTURE ? 40 : 3) && thumbQ.length;) { const it = thumbQ.shift()!; if (it[0].isConnected) { renderThumb(it[0], it[1]); q++; } }
     if ((ST.panel === 'Styles' || ST.panel === 'Poses') && ST.rev !== ST.panelRev && t - ST.revAt > 0.6 && ST.mode === 'single') buildPanel();
     if (t - lastDial > 0.08) { lastDial = t; syncDials(); }
+    updateMeter();
     transport();
   } catch (e) { console.error(e); }
 }
@@ -763,7 +853,7 @@ if (!CAPTURE) requestAnimationFrame(loop);
 
 declare global { interface Window { Studio: unknown } }
 window.Studio = {
-  exec, step, openPanel, setMode, conductor: bts, stage,
+  exec, step, openPanel, setMode, conductor: bts, stage, voice,
   renderBeatWav: (sec: number) => Beat.render(bts.bpm, sec).then(Beat.wav64),
   project: () => currentProject(), loadProject, shareCode: () => encodeShare(currentProject()),
   setScore: (text: string) => { const ta = edTa(); ta.value = text; ta.dispatchEvent(new Event('input')); clearTimeout(applyTimer); applyScore(); },
