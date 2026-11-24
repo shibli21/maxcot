@@ -18,7 +18,7 @@ figure{margin:0}canvas{display:block;width:240px;height:200px}</style></head>
     var f = document.createElement('figure'), c = document.createElement('canvas'); c.width = 480; c.height = 400;
     f.appendChild(c); var cap = document.createElement('figcaption'); cap.textContent = it.style + ' / ' + it.who + ' / ' + it.pose; f.appendChild(cap); document.body.appendChild(f);
     try {
-      var h = createCharacter(c, { who: it.who, skin: byName[it.style], guides: q.get('guides') === '1' });
+      var h = createCharacter(c, { autoplay: false, who: it.who, skin: byName[it.style], guides: q.get('guides') === '1' });
       h.actor.pose(it.pose).snap(); h.actor.t = 1.3; h.draw(1.3, true); h.draw(1.4, true);
     } catch (e) { errors.push(it.style + ': ' + e.message); console.error(e); }
   });

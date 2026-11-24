@@ -1,14 +1,18 @@
 // engine/skins/glitch.js: GLITCH. Signal (the picture breaks) and time (frames leak into each other).
 // Each one renders an ordinary skin into a buffer, then damages it.
 import K from '../kit.js';
+import type { Ctx2D, FillKey, Part, Pt, Scene, Skin, View } from '../types.js';
+import type { LineFn, ToonStyle } from '../kit.js';
+type Pal = Partial<Record<FillKey, string | null>>;
+void (0 as unknown as Pt | ToonStyle | LineFn);
 import * as drawn from './drawn.js';
 import * as print from './print.js';
 import * as screens from './screens.js';
-const Skins = {};
-  var tv = function (k, d) { return K.tv ? K.tv(k, d) : d; };
+const Skins: Record<string, Skin> = {};
+  var tv = K.tv;
   var BY_NAME = Object.assign({}, drawn, print, screens, Skins);   // glitch skins damage other skins, chosen by name
 
-  function inner(S, view, name, tag, ground) {
+  function inner(S: Scene, view: View, name: string, tag: string, ground?: boolean) {
     var buf = K.buffer(tag + S.key, S.w, S.h), c = buf.ctx, sk = BY_NAME[name] || drawn.pencil;
     c.setTransform(1, 0, 0, 1, 0, 0); c.globalCompositeOperation = 'source-over'; c.globalAlpha = 1; c.filter = 'none';
     c.clearRect(0, 0, S.w, S.h);
@@ -16,18 +20,18 @@ const Skins = {};
     c.save(); sk.draw(S, c, view); c.restore();
     return buf;
   }
-  function paper(ctx, w, h) { K.paper(ctx, w, h, '#f2f1ea', 1); }
+  function paper(ctx: Ctx2D, w: number, h: number) { K.paper(ctx, w, h, '#f2f1ea', 1); }
 
   // ── glitch: RGB split and torn scan slices ───────────────────────────────
   Skins.glitch = {
     name: 'glitch', label: 'Glitch', group: 'signal', about: 'A dropped signal: channels split, scan lines tear sideways.',
     fps: 12, hold: 'skin', ground: { css: '#f2f1ea', draw: paper }, params: [['glitch.amount', 'Damage', 0, 2, 1]],
-    draw: function (S, ctx, view) {
+    draw: function (S: Scene, ctx: Ctx2D, view: View) {
       var src = inner(S, view, tv('glitch.base', 'sketch'), 'g0', true), rnd = K.rng(S.seed * 97 + 1), u = S.unit, amt = tv('glitch.amount', 1);
       var sh = u * 0.025 * amt * (0.4 + rnd());
       ctx.drawImage(src, 0, 0);
       ctx.save(); ctx.globalCompositeOperation = 'multiply'; ctx.globalAlpha = 0.6;
-      var tint = function (col, dx) { var b = K.buffer('gt' + col + S.key, S.w, S.h), c = b.ctx; c.globalCompositeOperation = 'source-over'; c.clearRect(0, 0, S.w, S.h); c.drawImage(src, 0, 0); c.globalCompositeOperation = 'screen'; c.fillStyle = col; c.fillRect(0, 0, S.w, S.h); ctx.drawImage(b, dx, 0); };
+      var tint = function (col: string, dx: number) { var b = K.buffer('gt' + col + S.key, S.w, S.h), c = b.ctx; c.globalCompositeOperation = 'source-over'; c.clearRect(0, 0, S.w, S.h); c.drawImage(src, 0, 0); c.globalCompositeOperation = 'screen'; c.fillStyle = col; c.fillRect(0, 0, S.w, S.h); ctx.drawImage(b, dx, 0); };
       tint('#00ffff', -sh); tint('#ff00ff', sh * 0.7);
       ctx.restore();
       var n = 3 + (rnd() * 6 | 0) * amt;
@@ -40,7 +44,7 @@ const Skins = {};
   Skins.datamosh = {
     name: 'datamosh', label: 'Datamosh', group: 'signal', about: 'The keyframes went missing. Blocks keep sliding along old motion vectors.',
     fps: 15, hold: { redraw: true }, ground: { css: '#f2f1ea', draw: paper },
-    draw: function (S, ctx, view) {
+    draw: function (S: Scene, ctx: Ctx2D, view: View) {
       var fresh = inner(S, view, tv('datamosh.base', 'felttip'), 'dm0', true), prev = K.buffer('dm1' + S.key, S.w, S.h), out = K.buffer('dm2' + S.key, S.w, S.h);
       var rnd = K.rng(S.seed * 31 + 7), bs = Math.max(8, Math.round(S.unit * 0.05)), key = (Math.floor(view.t / 2.2) !== prev.kf);
       var c = out.ctx; c.globalCompositeOperation = 'source-over';
@@ -62,7 +66,7 @@ const Skins = {};
   Skins.databend = {
     name: 'databend', label: 'Databend', group: 'signal', about: 'The image bytes run through an audio editor: echoes, swapped channels, bit rot.',
     fps: 8, hold: 'skin', ground: { css: '#f2f1ea', draw: paper },
-    draw: function (S, ctx, view) {
+    draw: function (S: Scene, ctx: Ctx2D, view: View) {
       var src = inner(S, view, tv('databend.base', 'gloss'), 'db0', true), c = src.ctx, img = c.getImageData(0, 0, S.w, S.h), d = img.data, rnd = K.rng(S.seed * 7 + 3);
       var row = S.w * 4, n = 4 + (rnd() * 5 | 0);
       for (var i = 0; i < n; i++) {
@@ -79,8 +83,8 @@ const Skins = {};
   // ── feedback: a camera pointed at its own monitor ────────────────────────
   Skins.feedback = {
     name: 'feedback', label: 'Video feedback', group: 'signal', about: 'A camera pointed at its own monitor: the frame falls forever into itself.',
-    fps: 30, hold: { redraw: true }, ground: { css: '#06040c', draw: function (ctx, w, h) { ctx.fillStyle = '#06040c'; ctx.fillRect(0, 0, w, h); } },
-    draw: function (S, ctx, view) {
+    fps: 30, hold: { redraw: true }, ground: { css: '#06040c', draw: function (ctx: Ctx2D, w: number, h: number) { ctx.fillStyle = '#06040c'; ctx.fillRect(0, 0, w, h); } },
+    draw: function (S: Scene, ctx: Ctx2D, view: View) {
       var fb = K.buffer('fb' + S.key, S.w, S.h), tmp = K.buffer('fbt' + S.key, S.w, S.h), c = tmp.ctx;
       c.globalCompositeOperation = 'source-over'; c.filter = 'none'; c.fillStyle = '#06040c'; c.fillRect(0, 0, S.w, S.h);
       c.save(); c.globalAlpha = 0.93; c.filter = 'hue-rotate(24deg) saturate(1.4)';
@@ -96,8 +100,8 @@ const Skins = {};
   Skins.trails = {
     name: 'trails', label: 'Window trails', group: 'time', about: 'A frozen 2001 desktop: a clean background that never repaints, so every frame stays.',
     fps: 20, hold: { redraw: true },
-    ground: { css: '#3a6ea5', draw: function (ctx, w, h) { ctx.fillStyle = '#3a6ea5'; ctx.fillRect(0, 0, w, h); } },
-    draw: function (S, ctx, view) {
+    ground: { css: '#3a6ea5', draw: function (ctx: Ctx2D, w: number, h: number) { ctx.fillStyle = '#3a6ea5'; ctx.fillRect(0, 0, w, h); } },
+    draw: function (S: Scene, ctx: Ctx2D, view: View) {
       var buf = K.buffer('tr' + S.key, S.w, S.h), c = buf.ctx, u = S.unit, epoch = Math.floor(view.t / 7);
       if (buf.epoch !== epoch) { c.fillStyle = '#3a6ea5'; c.fillRect(0, 0, S.w, S.h); buf.epoch = epoch; }
       var dx = Math.sin(view.t * 1.1) * S.w * 0.16, dy = Math.sin(view.t * 1.7) * S.h * 0.05, b = S.body;
@@ -117,7 +121,7 @@ const Skins = {};
   Skins.pixelwind = {
     name: 'pixelwind', label: 'Pixel wind', group: 'time', about: 'A wind that takes the figure apart, a block at a time, off to the right.',
     fps: 24, hold: { redraw: true }, ground: { css: '#f2f1ea', draw: paper },
-    draw: function (S, ctx, view) {
+    draw: function (S: Scene, ctx: Ctx2D, view: View) {
       var src = inner(S, view, tv('pixelwind.base', 'pencil'), 'pw0', false), u = S.unit, b = S.body, amt = K.clamp(tv('pixelwind.wind', 0.3), 0, 1);
       var rnd = K.rng(1234), bs = Math.max(3, Math.round(u * 0.018)), t = view.t, cut = b.x + b.w * (1.15 - amt * 1.3);
       ctx.save(); ctx.beginPath(); ctx.rect(0, 0, cut, S.h); ctx.clip(); ctx.drawImage(src, 0, 0); ctx.restore();
@@ -136,7 +140,7 @@ const Skins = {};
   Skins.stylemosh = {
     name: 'stylemosh', label: 'Style mosh', group: 'time', about: 'Bands of the frame stuck in different skins, reshuffled twice a second.',
     fps: 8, hold: 'skin', ground: { css: '#f2f1ea', draw: paper },
-    draw: function (S, ctx, view) {
+    draw: function (S: Scene, ctx: Ctx2D, view: View) {
       var pool = ['pencil', 'felttip', 'riso', 'hologram', 'inkpunch', 'gloss', 'manga', 'sketch'], bands = 5, b = S.body, u = S.unit;
       var y0 = b.y - u * 0.5, h = b.h + u * 1.1, step = Math.floor(view.t * 2);
       for (var i = 0; i < bands; i++) {
@@ -147,5 +151,11 @@ const Skins = {};
       }
     }
   };
-export const { glitch, datamosh, databend, feedback, trails, pixelwind, stylemosh } = Skins;
+export const glitch: Skin = Skins.glitch!;
+export const datamosh: Skin = Skins.datamosh!;
+export const databend: Skin = Skins.databend!;
+export const feedback: Skin = Skins.feedback!;
+export const trails: Skin = Skins.trails!;
+export const pixelwind: Skin = Skins.pixelwind!;
+export const stylemosh: Skin = Skins.stylemosh!;
 

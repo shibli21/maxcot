@@ -13,7 +13,7 @@ describe('design', () => {
   });
   it('layers a cast member over the defaults', () => {
     const boss = resolveDesign('boss');
-    expect(boss['body.w']).toBe(CAST.boss.values['body.w']);
+    expect(boss['body.w']).toBe(CAST.boss!.values['body.w']);
     expect(boss['eyes.lash']).toBe(DESIGN_DEFAULTS['eyes.lash']);
   });
   it('falls back to max for an unknown actor', () => {
@@ -49,19 +49,19 @@ describe('actor springs', () => {
     const a = new Actor();
     a.pose('laughing');
     for (let i = 0; i < 200; i++) a.update(1 / 60);
-    expect(a.ch['mouth.open']).toBeCloseTo(a.to['mouth.open'], 3);
+    expect(a.ch['mouth.open']).toBeCloseTo(a.to['mouth.open']!, 3);
   });
   it('morphs the design toward a new cast member', () => {
     const a = new Actor();
     a.cast('oldman');
     for (let i = 0; i < 120; i++) a.update(1 / 60);
-    expect(a.design['body.h']).toBeCloseTo(CAST.oldman.values['body.h'], 2);
+    expect(a.design['body.h']).toBeCloseTo(CAST.oldman!.values['body.h']!, 2);
   });
 });
 
 describe('conductor', () => {
   const events = [{ at: [1, 1], a: 1 }, { at: [1, 3], b: 2 }, { at: [2, 1], a: 3, palette: 'x' }];
-  const make = (log) => createConductor({
+  const make = (log: unknown[][]) => createConductor({
     bpm: 60, events, modifiers: ['at', 'palette'],
     onCommand: (cmd, v, e, ctx) => log.push([cmd, v, ctx.instant]),
     onReset: () => log.push(['reset'])
@@ -73,14 +73,14 @@ describe('conductor', () => {
     expect(c.barBeat(5.5)).toEqual([2, 2.5]);
   });
   it('fires commands on time, skipping modifiers', () => {
-    const log = []; const c = make(log);
+    const log: unknown[][] = []; const c = make(log);
     c.play(); c.tick(0.5); c.tick(1.6);
     expect(log).toEqual([['a', 1, false], ['b', 2, false]]);
     c.tick(2);
     expect(log.at(-1)).toEqual(['a', 3, false]);
   });
   it('seeks by resetting and replaying instantly', () => {
-    const log = []; const c = make(log);
+    const log: unknown[][] = []; const c = make(log);
     c.seek(2.5);
     expect(log).toEqual([['reset'], ['a', 1, true], ['b', 2, true]]);
     expect(c.songT).toBe(2.5);
@@ -88,14 +88,14 @@ describe('conductor', () => {
 });
 
 describe('scene', () => {
-  const build = (who, pose) => {
+  const build = (who: string, pose: string) => {
     const a = new Actor({ who }); a.pose(pose).snap();
     const F = a.frame(1);
     return scene(F, { w: 800, h: 600, cam: camera(F.P, 800, 600, 'full') });
   };
   it('produces a visible front face and a silhouette', () => {
     const S = build('max', 'rest');
-    const front = S.parts.find((p) => p.role === 'front');
+    const front = S.parts.find((p) => p.role === 'front')!;
     expect(front.pts.length).toBeGreaterThan(8);
     const area = front.pts.reduce((s, p, i, a) => s + p[0] * a[(i + 1) % a.length][1] - a[(i + 1) % a.length][0] * p[1], 0) / 2;
     expect(area).toBeLessThan(0);

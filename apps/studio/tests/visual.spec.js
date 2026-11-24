@@ -25,7 +25,7 @@ for (const [name, at] of Object.entries(STATES)) {
     }, at);
     // let ResizeObserver/layout settle (a resize clears a canvas), then draw again
     await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
-    await page.evaluate(() => { for (let i = 0; i < 4; i++) window.Studio.step(0.04); });
+    await page.evaluate(() => { for (let i = 0; i < 20; i++) window.Studio.step(0.04); });
     await expect(page).toHaveScreenshot(`studio-${name}.png`);
   });
 }

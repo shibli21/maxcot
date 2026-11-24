@@ -1,10 +1,15 @@
-// engine/design.js
+// design.ts
+import type { DesignValues } from './types.js';
+
+/** [key, group, label, help, min, max, default] */
+export type DesignRow = [string, string, string, string, number, number, number];
+export interface CastMember { key: string; label: string; about: string; values: DesignValues }
 // DESIGN: what the character IS. One row per dial:
 //   [key, group, label, help, min, max, default]
 // The studio builds its Design panel from this table, and every cast member is
 // just a set of overrides on top of it. Same rig, new coat.
 
-  var DESIGN = [
+  var DESIGN: DesignRow[] = [
     ['body.w', 'body', 'Width', 'Half the width of the block, in body units.', 0.45, 1.7, 1.0],
     ['body.h', 'body', 'Height', 'Half the height of the block.', 0.5, 1.7, 1.0],
     ['body.d', 'body', 'Thickness', 'Depth front to back.', 0.15, 1.2, 0.62],
@@ -50,12 +55,13 @@
     ['rest.float', 'rest', 'Float', 'Idle bob.', 0, 1, 0.5]
   ];
 
-  var DEFAULTS = {};
+  var DEFAULTS: DesignValues = {};
   DESIGN.forEach(function (r) { DEFAULTS[r[0]] = r[6]; });
 
   // CAST: same rig, different actor. cast(key, label, about, values)
-  var CAST = {};
-  function cast(key, label, about, v) { CAST[key] = { key: key, label: label, about: about, values: v }; }
+  var CAST: Record<string, CastMember> = {};
+  /** Add an actor: a label, a one-line description and the dials it overrides. */
+  function cast(key: string, label: string, about: string, v: DesignValues): void { CAST[key] = { key: key, label: label, about: about, values: v }; }
 
   cast('max', 'Max', 'The fridge. The original.', {});
   cast('child', 'Child', 'Short and round, eyes too big for the face.', {
@@ -93,10 +99,11 @@
     'eyes.size': 0.14, 'eyes.aspect': 0.85, 'eyes.shape': 1, 'eyes.bag': 1, 'eyes.upper': 0.35,
     'brows.len': 0.34, 'brows.thick': 0.07, 'brows.arch': 0.1, 'brows.gap': 0.12
   });
-  CAST.kid = CAST.child;
+  CAST.kid = CAST.child!;
 
-  function resolve(who) {
-    var c = CAST[who] || CAST.max, out = {};
+  /** The full design for an actor: DESIGN defaults with its overrides on top. */
+  function resolve(who?: string): DesignValues {
+    var c = (who && CAST[who]) || CAST.max!, out: DesignValues = {};
     for (var k in DEFAULTS) out[k] = DEFAULTS[k];
     for (var j in c.values) out[j] = c.values[j];
     return out;

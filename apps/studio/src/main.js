@@ -21,7 +21,7 @@ import './studio.css';
     scene: scene,
     render: function (ctx, w, h, F, o) { return render(ctx, w, h, F, Object.assign({}, o, { skin: Skins[o.style] || Skins.pencil })); },
     create: function (canvas, o) {
-      var h = createCharacter(canvas, Object.assign({}, o, { skin: Skins[o.style || 'pencil'] }));
+      var h = createCharacter(canvas, Object.assign({ autoplay: false }, o, { skin: Skins[o.style || 'pencil'] }));
       Object.defineProperty(h, 'style', { get: function () { return this.skin && this.skin.name; }, set: function (v) { if (!this.skin || this.skin.name !== v) { this.skin = Skins[v]; this.dirty = true; } } });
       return h;
     }

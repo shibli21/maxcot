@@ -8,14 +8,17 @@ import { print, riso, gigposter, stencil, manga, cubist } from './print.js';
 import { hologram, wireframe, neon, oscilloscope, teletext, pixel } from './screens.js';
 import { glitch, datamosh, databend, feedback, trails, pixelwind, stylemosh } from './glitch.js';
 
-export const GROUPS = [['drawn', 'Drawn'], ['print', 'Print and paste'], ['screens', 'Screens and light'], ['signal', 'Glitch: signal'], ['time', 'Glitch: time']];
+import type { Skin, SkinGroup } from '../types.js';
+
+export const GROUPS: Array<[SkinGroup, string]> = [['drawn', 'Drawn'], ['print', 'Print and paste'], ['screens', 'Screens and light'], ['signal', 'Glitch: signal'], ['time', 'Glitch: time']];
 
 // Every skin, in catalogue order (module namespaces would sort them alphabetically).
-export const allSkins = [
+export const allSkins: Skin[] = [
   pencil, sketch, ballpoint, felttip, inkbleed, inkpunch, gloss,
   print, riso, gigposter, stencil, manga, cubist,
   hologram, wireframe, neon, oscilloscope, teletext, pixel,
   glitch, datamosh, databend, feedback,
   trails, pixelwind, stylemosh
 ];
-export function skinsByName(list) { const m = {}; (list || allSkins).forEach((s) => { m[s.name] = s; }); return m; }
+/** Look skins up by name, e.g. when a score or a film names its styles as strings. */
+export function skinsByName(list?: Skin[]): Record<string, Skin> { const m: Record<string, Skin> = {}; (list || allSkins).forEach((s) => { m[s.name] = s; }); return m; }
