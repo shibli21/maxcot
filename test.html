@@ -1,0 +1,32 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Engine test sheet</title>
+<style>body{margin:0;background:#222;display:flex;flex-wrap:wrap;gap:4px;padding:4px;font:11px system-ui;color:#ccc}
+figure{margin:0}canvas{display:block;width:240px;height:200px}</style></head>
+<body>
+<script src="engine/kit.js"></script>
+<script src="engine/design.js"></script>
+<script src="engine/rig.js"></script>
+<script src="engine/character.js"></script>
+<script src="engine/skins/drawn.js"></script>
+<script src="engine/skins/print.js"></script>
+<script src="engine/skins/screens.js"></script>
+<script src="engine/skins/glitch.js"></script>
+<script>
+  var q = new URLSearchParams(location.search);
+  var mode = q.get('mode') || 'poses';
+  var list = [];
+  if (mode === 'poses') ['rest','thinking','selling','laughing','dunno','fedup','deal','secret','feel-crying','feel-flirting','feel-furious','eyes-happy','mouth-gasp','count3','thumbsup','wave'].forEach(function (p) { list.push({ pose: p, style: q.get('style') || 'pencil', who: 'max' }); });
+  if (mode === 'cast') Object.keys(MaxcotDesign.CAST).forEach(function (w) { list.push({ pose: 'rest', style: q.get('style') || 'pencil', who: w }); });
+  if (mode === 'skins') Object.keys(CharacterSkins).forEach(function (s) { list.push({ pose: q.get('pose') || 'rest', style: s, who: 'max' }); });
+  var errors = [];
+  list.forEach(function (it) {
+    var f = document.createElement('figure'), c = document.createElement('canvas'); c.width = 480; c.height = 400;
+    f.appendChild(c); var cap = document.createElement('figcaption'); cap.textContent = it.style + ' / ' + it.who + ' / ' + it.pose; f.appendChild(cap); document.body.appendChild(f);
+    try {
+      var h = Ch.create(c, { who: it.who, style: it.style, guides: q.get('guides') === '1' });
+      h.actor.pose(it.pose).snap(); h.actor.t = 1.3; h.draw(1.3, true); h.draw(1.4, true);
+    } catch (e) { errors.push(it.style + ': ' + e.message); console.error(e); }
+  });
+  document.title = errors.length ? 'ERR ' + errors.join(' | ') : 'OK ' + list.length;
+</script>
+</body></html>

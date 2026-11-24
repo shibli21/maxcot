@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Maxcot Studio</title>
+<link rel="stylesheet" href="studio.css">
+</head>
+<body>
+<div id="app">
+  <aside id="code">
+    <section class="pane" id="scorePane"><header>bts/score.js</header><div class="src" id="scoreSrc"></div></section>
+    <section class="pane" id="enginePane"><header id="engineFile">engine/character.js</header><div class="src" id="engineSrc"></div></section>
+  </aside>
+  <main id="stage">
+    <div id="views">
+      <div id="viewArea">
+        <div class="view" id="v-single"><canvas id="main"></canvas></div>
+        <div class="view" id="v-sizes"></div>
+        <div class="view grid" id="v-grid"></div>
+        <div class="view" id="v-aspects"></div>
+        <div class="view" id="v-film">
+          <div class="film-top"><div class="film-prev"><canvas id="filmCanvas"></canvas></div><div class="multicam" id="multicam"></div></div>
+          <div class="tl" id="timeline"></div>
+        </div>
+        <div class="view" id="v-card"><canvas id="cardCanvas"></canvas></div>
+        <svg id="pointer" viewBox="0 0 24 24" width="40" height="40"><path d="M3 2 L3 19 L7.6 14.8 L10.6 21.6 L13.6 20.3 L10.7 13.6 L17 13.6 Z" fill="#111" stroke="#fff" stroke-width="1.4" stroke-linejoin="round"/></svg>
+      </div>
+      <div id="panel">
+        <nav id="tabs"></nav>
+        <div id="panelBody"></div>
+      </div>
+    </div>
+    <div id="transport">
+      <button id="bPlay" title="Play / pause (space)">&#9654;</button>
+      <button id="bRestart" title="Back to the top">&#10226;</button>
+      <button id="bPrev" title="Previous bar (&larr;)">&#9664;&#9664;</button>
+      <button id="bNext" title="Next bar (&rarr;)">&#9654;&#9654;</button>
+      <span id="pos">bar 1 &middot; 1</span>
+      <input id="scrub" type="range" min="0" max="60" step="0.01" value="0">
+      <span id="clock">0:00.0</span>
+      <label><input type="checkbox" id="cSound" checked> Beat</label>
+      <label><input type="checkbox" id="cCode" checked> Code</label>
+      <button id="bPanel" title="Open the studio panel">Panel</button>
+    </div>
+  </main>
+  <div id="intro">
+    <div id="typed"></div>
+    <div id="introUi">
+      <button id="bStart">&#9654; Play the score</button>
+      <button id="bFree">Open the studio</button>
+      <p>One rig, one score, every frame drawn in code. Space plays and pauses. Arrow keys jump a bar.</p>
+    </div>
+  </div>
+</div>
+<script src="engine/kit.js"></script>
+<script src="engine/design.js"></script>
+<script src="engine/rig.js"></script>
+<script src="engine/character.js"></script>
+<script src="engine/skins/drawn.js"></script>
+<script src="engine/skins/print.js"></script>
+<script src="engine/skins/screens.js"></script>
+<script src="engine/skins/glitch.js"></script>
+<script src="filmkit/film.js"></script>
+<script src="filmkit/films/hello.js"></script>
+<script src="bts/score.js"></script>
+<script src="bts/audio.js"></script>
+<script src="bts/bts.js"></script>
+<script src="studio.js"></script>
+</body>
+</html>
