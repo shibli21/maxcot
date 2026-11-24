@@ -4,10 +4,11 @@
 // functions, so anything the score can do, a person can do by hand.
 import { kit as K, Actor, Character, CAST, DESIGN, POSES, POSE_SECTIONS, render, type DesignRow, type DesignValues, type Skin } from 'maxcot';
 import { GROUPS, allSkins, skinsByName } from 'maxcot/skins';
-import { Editor, Player, card, type StyleSegment, type TrackName, type WhoSegment } from 'maxcot/film';
+import { Editor, Player, card, type Film, type StyleSegment, type TrackName, type WhoSegment } from 'maxcot/film';
 import { createConductor, parseScore, type CommandContext, type Conductor, type ScheduledEvent, type ScoreEvent } from 'maxcot/score';
 import hello from './hello';
 import Beat from './beat';
+import { decodeShare, encodeShare, fileName, makeProject, readProject, type Project } from './project';
 import './studio.css';
 // The code panes show the real source files.
 import characterSrc from '../../../packages/maxcot/src/character.ts?raw';
@@ -223,8 +224,8 @@ function buildAspects(W: number, H: number): void {
 // ── film ─────────────────────────────────────────────────────────────────
 function ensureFilm(): void {
   if (film) return;
-  film = new Player(structuredClone(hello), { skins: SKINS });
-  editor = new Editor($('#timeline'), film, { onPick: (row) => buildPicker(row), onAspect: layoutFilm, onChange: () => src('film') });
+  film = new Player(structuredClone(filmData), { skins: SKINS });
+  editor = new Editor($('#timeline'), film, { onPick: (row) => buildPicker(row), onAspect: layoutFilm, onChange: () => { src('film'); saveDraftSoon(); } });
 }
 const ASPECT: Record<string, number> = { wide: 16 / 9, tall: 9 / 16, square: 1, portrait: 0.8 };
 function layoutFilm(): void {
@@ -388,7 +389,7 @@ function renderScore(): void {
   const first = marks.find((m) => m.level === 'error') || marks[0], status = $('#scoreStatus');
   status.textContent = first
     ? (first.level === 'error' ? 'Line ' : 'Warning, line ') + (first.line + 1) + ': ' + first.message + (marks.length > 1 ? '  (+' + (marks.length - 1) + ' more)' : '')
-    : pending ? 'typing…' : scoreText === tourScore ? '' : 'edited, playing your version';
+    : pending ? 'typing…' : scoreText === tourScore ? '' : 'playing your version';
   status.className = first ? first.level : pending || scoreText === tourScore ? '' : 'ok';
   status.title = marks.map((m) => 'line ' + (m.line + 1) + ': ' + m.message).join('\n');
   syncScroll();
@@ -448,7 +449,67 @@ function applyScore(): void {
   bts.load(r.score.events, { bpm, tail: r.score.tail ?? 3.2 });
   $<HTMLInputElement>('#scrub').max = String(bts.total);
   renderScore();
+  saveDraftSoon();
 }
+// ── projects: open, save, share; a local draft survives reloads ──────────
+const TOUR_LABEL = 'apps/studio/src/scores/tour.score', DRAFT_KEY = 'maxcot.draft';
+let filmData: Film = hello, toastTimer = 0, draftTimer = 0;
+function toast(msg: string, kind = ''): void {
+  const t = $('#toast'); t.textContent = msg; t.className = 'on ' + kind;
+  clearTimeout(toastTimer); toastTimer = window.setTimeout(() => { t.className = ''; }, 3200);
+}
+function currentProject(): Project { return makeProject(scoreText, film ? film.film : filmData !== hello ? filmData : undefined); }
+function setLabel(label: string): void { $('#scoreFile').textContent = label; }
+function loadProject(p: Project, label: string): void {
+  filmData = p.film ? structuredClone(p.film) : hello;
+  setLabel(label);
+  const ta = edTa(); ta.value = p.score; scoreText = ta.value; pending = false;
+  clearTimeout(applyTimer); applyScore();
+}
+function saveDraftSoon(): void {
+  if (CAPTURE) return;
+  clearTimeout(draftTimer);
+  draftTimer = window.setTimeout(() => {
+    try {
+      const p = currentProject();
+      if (p.score === tourScore && !p.film) localStorage.removeItem(DRAFT_KEY); else localStorage.setItem(DRAFT_KEY, JSON.stringify(p));
+    } catch { /* storage full or blocked: drafts are a convenience only */ }
+  }, 600);
+}
+function saveProject(): void {
+  const p = currentProject(), a = el('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(p, null, 2)], { type: 'application/json' }));
+  a.download = fileName(p); document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  toast('Saved ' + a.download);
+}
+async function openFile(f: File): Promise<void> {
+  const r = readProject(await f.text());
+  if (!r.ok) { toast(r.error, 'error'); return; }
+  loadProject(r.project, f.name); saveDraftSoon(); toast('Opened ' + r.project.title);
+}
+async function shareProject(): Promise<void> {
+  const code = await encodeShare(currentProject()), url = location.origin + location.pathname + '#p=' + code;
+  history.replaceState(null, '', '#p=' + code);
+  try { await navigator.clipboard.writeText(url); toast('Share link copied (' + (url.length / 1024).toFixed(1) + ' KB)', 'ok'); }
+  catch { toast('Share link is in the address bar: copy it from there', 'ok'); }
+}
+/** On boot: a share link wins, then an unsaved draft, then the tour. */
+async function restoreProject(): Promise<void> {
+  const m = /^#p=([A-Za-z0-9_-]+)$/.exec(location.hash);
+  if (m) {
+    const r = await decodeShare(m[1]!);
+    if (r.ok) { loadProject(r.project, 'shared: ' + r.project.title); toast('Opened a shared project: ' + r.project.title, 'ok'); return; }
+    toast(r.error, 'error');
+  }
+  if (CAPTURE) return;
+  try {
+    const saved = localStorage.getItem(DRAFT_KEY); if (!saved) return;
+    const r = readProject(saved);
+    if (r.ok) { loadProject(r.project, 'draft: ' + r.project.title); toast('Restored your unsaved edits. Revert goes back to the tour.'); }
+  } catch { /* no storage */ }
+}
+
 function initEditor(): void {
   const ta = edTa(); ta.value = scoreText;
   ta.addEventListener('input', () => {
@@ -460,7 +521,14 @@ function initEditor(): void {
     if (e.key === 'Tab') { e.preventDefault(); ta.setRangeText('  ', ta.selectionStart, ta.selectionEnd, 'end'); ta.dispatchEvent(new Event('input')); }
     else if (e.key === 'Escape') ta.blur();
   });
-  $('#bRevert').onclick = () => { ta.value = tourScore; ta.dispatchEvent(new Event('input')); clearTimeout(applyTimer); applyScore(); };
+  $('#bRevert').onclick = () => {
+    filmData = hello; setLabel(TOUR_LABEL); if (location.hash) history.replaceState(null, '', location.pathname + location.search);
+    ta.value = tourScore; scoreText = ta.value; pending = false; clearTimeout(applyTimer); applyScore();
+  };
+  $('#bOpen').onclick = () => $<HTMLInputElement>('#fileOpen').click();
+  $<HTMLInputElement>('#fileOpen').onchange = (e) => { const inp = e.target as HTMLInputElement, f = inp.files && inp.files[0]; if (f) void openFile(f); inp.value = ''; };
+  $('#bSave').onclick = saveProject;
+  $('#bShare').onclick = () => { void shareProject(); };
   renderScore();
 }
 function lit(o: unknown): string[] { return JSON.stringify(o, null, 2).replace(/"([A-Za-z_$][\w$]*)":/g, '$1:').replace(/"((?:[^"\\]|\\.)*)"/g, "'$1'").split('\n'); }
@@ -584,6 +652,9 @@ setSound(!CAPTURE);
 if (CAPTURE) document.documentElement.classList.add('capture');
 marks = validate(tour.score.events, tour.lines);
 initEditor();
+void restoreProject();
+// a share link pasted into a tab that already has the studio open only changes the hash
+window.addEventListener('hashchange', () => { if (location.hash.indexOf('#p=') === 0) void restoreProject(); });
 reset(); wire(); showSource('create'); transport();
 if (!CAPTURE) requestAnimationFrame(loop);
 
@@ -591,6 +662,7 @@ declare global { interface Window { Studio: unknown } }
 window.Studio = {
   exec, step, openPanel, setMode, conductor: bts,
   renderBeatWav: (sec: number) => Beat.render(bts.bpm, sec).then(Beat.wav64),
+  project: () => currentProject(), loadProject, shareCode: () => encodeShare(currentProject()),
   setScore: (text: string) => { const ta = edTa(); ta.value = text; ta.dispatchEvent(new Event('input')); clearTimeout(applyTimer); applyScore(); },
   get state() { return ST; }, get film() { return film; }
 };

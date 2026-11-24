@@ -44,8 +44,14 @@
       <label><input type="checkbox" id="cSound" checked> Beat</label>
       <label><input type="checkbox" id="cCode" checked> Code</label>
       <button id="bPanel" title="Open the studio panel">Panel</button>
+      <span class="sep"></span>
+      <button id="bOpen" title="Open a .maxcot.json project">Open</button>
+      <button id="bSave" title="Download this project as a .maxcot.json file">Save</button>
+      <button id="bShare" title="Copy a link that opens this project">Share</button>
+      <input type="file" id="fileOpen" accept=".json,application/json" hidden>
     </div>
   </main>
+  <div id="toast" role="status" aria-live="polite"></div>
   <div id="intro">
     <div id="typed"></div>
     <div id="introUi">

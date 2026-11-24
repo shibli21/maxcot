@@ -14,7 +14,7 @@ test('score editor: an edit plays immediately, a syntax error is pinned to its l
     ta.focus(); ta.setSelectionRange(i + 1, i + 9);
   });
   await page.keyboard.type('neon');
-  await expect(status).toHaveText(/edited/);
+  await expect(status).toHaveText(/playing your version/);
   const style = await page.evaluate(() => { const C = window.Studio.conductor; C.seek(C.timeOf([5, 1.2])); return window.Studio.state.style; });
   expect(style).toBe('neon');
 

@@ -70,6 +70,13 @@ last good version keeps playing. A typo such as `pose: 'thinkin'` gets a warning
 suggestion. **Revert** goes back to the tour. Scores are plain data, parsed and never run,
 so a score from someone else is safe to open.
 
+**Save, open and share.** **Save** downloads your project (the score plus any timeline
+edits) as a `.maxcot.json` file, and **Open** loads one back. **Share** copies a link with the
+whole project packed into it. Nothing is uploaded; the project lives in the part of the URL
+after `#`, which browsers never send to a server, so a full tour fits in about 2 KB. Unsaved
+edits are kept as a local draft and come back after a reload. Files and links are read as data and
+checked field by field, so opening one from someone else can't run code.
+
 Each verb (`create`, `style`, `pose`, `who`, `set`, `play`, `camera`, `end` and the rest) is
 one function in the studio's `CMD` table, and the UI calls the same functions, so anything
 the score can do, you can do by hand.
