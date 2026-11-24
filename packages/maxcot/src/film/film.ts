@@ -43,7 +43,7 @@ export function card(ctx: Ctx2D, w: number, h: number, t: number, text: string):
   for (let d = -h; d < w; d += fs * 0.055) { c.beginPath(); c.moveTo(d + rnd() * 3, h); c.lineTo(d + h * 0.9 + rnd() * 3, 0); c.stroke(); }
   c.globalCompositeOperation = 'source-over';
   const reveal = K.clamp(t / 0.6, 0, 1);
-  ctx.save(); ctx.beginPath(); ctx.rect(0, 0, w * reveal * 1.1, h); ctx.clip(); ctx.drawImage(buf, 0, 0); ctx.restore();
+  ctx.save(); ctx.beginPath(); ctx.rect(0, 0, w * reveal * 1.1, h); ctx.clip(); ctx.drawImage(buf.canvas, 0, 0); ctx.restore();
 }
 
 // ── Player ───────────────────────────────────────────────────────────────

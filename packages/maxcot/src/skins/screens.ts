@@ -121,7 +121,7 @@ const Skins: Record<string, Skin> = {};
         K.path(c, q, !p.line || p.closed); c.stroke();
       });
       c.restore();
-      ctx.drawImage(buf, 0, 0);
+      ctx.drawImage(buf.canvas, 0, 0);
       ctx.strokeStyle = 'rgba(80,255,120,0.12)'; ctx.lineWidth = 1;
       for (var gx = 0; gx <= 10; gx++) { ctx.beginPath(); ctx.moveTo(gx * S.w / 10, 0); ctx.lineTo(gx * S.w / 10, S.h); ctx.stroke(); }
       for (var gy = 0; gy <= 8; gy++) { ctx.beginPath(); ctx.moveTo(0, gy * S.h / 8); ctx.lineTo(S.w, gy * S.h / 8); ctx.stroke(); }
@@ -173,7 +173,7 @@ const Skins: Record<string, Skin> = {};
       var img = c.getImageData(0, 0, sw, shh), d = img.data;
       for (var i = 0; i < d.length; i += 4) d[i + 3] = d[i + 3] > 110 ? 255 : 0;
       c.putImageData(img, 0, 0);
-      ctx.imageSmoothingEnabled = false; ctx.drawImage(buf, 0, 0, sw, shh, 0, 0, S.w, S.h); ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingEnabled = false; ctx.drawImage(buf.canvas, 0, 0, sw, shh, 0, 0, S.w, S.h); ctx.imageSmoothingEnabled = true;
     }
   };
 export const hologram: Skin = Skins.hologram!;

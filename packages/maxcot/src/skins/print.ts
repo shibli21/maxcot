@@ -80,7 +80,7 @@ const Skins: Record<string, Skin> = {};
         c.restore();
       });
       ctx.save(); ctx.globalCompositeOperation = 'multiply';
-      ctx.drawImage(A, u * 0.012, -u * 0.008); ctx.drawImage(Bf, -u * 0.006, u * 0.006);
+      ctx.drawImage(A.canvas, u * 0.012, -u * 0.008); ctx.drawImage(Bf.canvas, -u * 0.006, u * 0.006);
       ctx.restore();
     }
   };
@@ -142,8 +142,8 @@ const Skins: Record<string, Skin> = {};
       ctx.save();
       ctx.fillStyle = 'rgba(214,40,40,0.82)'; ctx.filter = 'blur(' + (u * 0.006).toFixed(1) + 'px)';
       K.path(ctx, S.front, true); ctx.fill(); ctx.filter = 'none';
-      ctx.globalAlpha = 0.35; ctx.filter = 'blur(' + (u * 0.012).toFixed(1) + 'px)'; ctx.drawImage(A, 0, 0);
-      ctx.filter = 'none'; ctx.globalAlpha = 1; ctx.drawImage(A, 0, 0);
+      ctx.globalAlpha = 0.35; ctx.filter = 'blur(' + (u * 0.012).toFixed(1) + 'px)'; ctx.drawImage(A.canvas, 0, 0);
+      ctx.filter = 'none'; ctx.globalAlpha = 1; ctx.drawImage(A.canvas, 0, 0);
       // speckle overspray
       ctx.fillStyle = 'rgba(20,20,20,0.5)';
       for (var i = 0; i < 500; i++) { var a = rnd() * K.TAU, r = Math.hypot(S.body.w, S.body.h) * (0.45 + rnd() * 0.25); ctx.fillRect(S.body.cx + Math.cos(a) * r, S.body.cy + Math.sin(a) * r * 0.8, 1.2, 1.2); }
@@ -193,12 +193,12 @@ const Skins: Record<string, Skin> = {};
         for (var k = 0; k < n; k++) { var a = k / n * K.TAU + rnd() * 0.8; poly.push([cx + Math.cos(a) * r, cy + Math.sin(a) * r]); }
         var dx = (rnd() - 0.5) * u * 0.12, dy = (rnd() - 0.5) * u * 0.08, rot = (rnd() - 0.5) * 0.25;
         ctx.save(); K.path(ctx, poly, true); ctx.clip();
-        ctx.translate(cx, cy); ctx.rotate(rot); ctx.translate(-cx + dx, -cy + dy); ctx.drawImage(A, 0, 0);
+        ctx.translate(cx, cy); ctx.rotate(rot); ctx.translate(-cx + dx, -cy + dy); ctx.drawImage(A.canvas, 0, 0);
         ctx.restore();
         ctx.fillStyle = tints[i % 4]; K.path(ctx, poly, true); ctx.fill();
         ctx.strokeStyle = 'rgba(43,33,24,0.6)'; ctx.lineWidth = 1; ctx.stroke();
       }
-      ctx.globalAlpha = 0.55; ctx.drawImage(A, 0, 0); ctx.globalAlpha = 1;
+      ctx.globalAlpha = 0.55; ctx.drawImage(A.canvas, 0, 0); ctx.globalAlpha = 1;
     }
   };
 export const print: Skin = Skins.print!;

@@ -19,7 +19,8 @@ export default defineConfig({
       input: {
         studio: resolve(import.meta.dirname, 'index.html'),
         sheet: resolve(import.meta.dirname, 'sheet.html'),
-        poster: resolve(import.meta.dirname, 'poster.html')
+        poster: resolve(import.meta.dirname, 'poster.html'),
+        example: resolve(import.meta.dirname, 'example.html')
       }
     }
   }

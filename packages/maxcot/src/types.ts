@@ -6,8 +6,8 @@ export type Rnd = () => number;
 /** The renderer only ever draws on a 2D context. OffscreenCanvas contexts are cast to this. */
 export type Ctx2D = CanvasRenderingContext2D;
 export type CanvasLike = HTMLCanvasElement | OffscreenCanvas;
-/** A reusable offscreen canvas with its context attached. */
-export type Buffer = HTMLCanvasElement & { ctx: Ctx2D; [extra: string]: unknown };
+/** A reusable offscreen canvas, its context, and any state a skin wants to keep with it. */
+export interface Buffer { canvas: HTMLCanvasElement; ctx: Ctx2D; [state: string]: unknown }
 
 /** What a part should be filled with; each skin maps these to its own colours. */
 export type FillKey =

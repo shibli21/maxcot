@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Maxcot: smallest example</title>
+<style>html, body { margin: 0; background: #f2f1ea; } canvas { display: block; width: 100vw; height: 100vh; }</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script type="module">
+  // The README's first example, verbatim: one character, a few poses, a skin change.
+  import { createCharacter } from 'maxcot';
+  import { pencil, hologram } from 'maxcot/skins';
+
+  const canvas = document.querySelector('#c');
+  canvas.width = innerWidth * devicePixelRatio; canvas.height = innerHeight * devicePixelRatio;
+
+  const max = createCharacter(canvas, { skin: pencil, pose: 'wave' });
+  setTimeout(() => max.pose('feel-excited'), 1500);
+  setTimeout(() => max.setSkin(hologram, 'cyan').pose('thumbsup'), 3000);
+  window.max = max;
+</script>
+</body>
+</html>

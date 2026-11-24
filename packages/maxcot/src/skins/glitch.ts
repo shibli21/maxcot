@@ -29,13 +29,13 @@ const Skins: Record<string, Skin> = {};
     draw: function (S: Scene, ctx: Ctx2D, view: View) {
       var src = inner(S, view, tv('glitch.base', 'sketch'), 'g0', true), rnd = K.rng(S.seed * 97 + 1), u = S.unit, amt = tv('glitch.amount', 1);
       var sh = u * 0.025 * amt * (0.4 + rnd());
-      ctx.drawImage(src, 0, 0);
+      ctx.drawImage(src.canvas, 0, 0);
       ctx.save(); ctx.globalCompositeOperation = 'multiply'; ctx.globalAlpha = 0.6;
-      var tint = function (col: string, dx: number) { var b = K.buffer('gt' + col + S.key, S.w, S.h), c = b.ctx; c.globalCompositeOperation = 'source-over'; c.clearRect(0, 0, S.w, S.h); c.drawImage(src, 0, 0); c.globalCompositeOperation = 'screen'; c.fillStyle = col; c.fillRect(0, 0, S.w, S.h); ctx.drawImage(b, dx, 0); };
+      var tint = function (col: string, dx: number) { var b = K.buffer('gt' + col + S.key, S.w, S.h), c = b.ctx; c.globalCompositeOperation = 'source-over'; c.clearRect(0, 0, S.w, S.h); c.drawImage(src.canvas, 0, 0); c.globalCompositeOperation = 'screen'; c.fillStyle = col; c.fillRect(0, 0, S.w, S.h); ctx.drawImage(b.canvas, dx, 0); };
       tint('#00ffff', -sh); tint('#ff00ff', sh * 0.7);
       ctx.restore();
       var n = 3 + (rnd() * 6 | 0) * amt;
-      for (var i = 0; i < n; i++) { var y = rnd() * S.h, hh = u * (0.01 + rnd() * 0.06), dx = (rnd() - 0.5) * u * 0.3 * amt; ctx.drawImage(src, 0, y, S.w, hh, dx, y, S.w, hh); }
+      for (var i = 0; i < n; i++) { var y = rnd() * S.h, hh = u * (0.01 + rnd() * 0.06), dx = (rnd() - 0.5) * u * 0.3 * amt; ctx.drawImage(src.canvas, 0, y, S.w, hh, dx, y, S.w, hh); }
       if (rnd() < 0.3) { ctx.fillStyle = 'rgba(0,0,0,0.85)'; ctx.fillRect(0, rnd() * S.h, S.w, 2); }
     }
   };
@@ -48,17 +48,17 @@ const Skins: Record<string, Skin> = {};
       var fresh = inner(S, view, tv('datamosh.base', 'felttip'), 'dm0', true), prev = K.buffer('dm1' + S.key, S.w, S.h), out = K.buffer('dm2' + S.key, S.w, S.h);
       var rnd = K.rng(S.seed * 31 + 7), bs = Math.max(8, Math.round(S.unit * 0.05)), key = (Math.floor(view.t / 2.2) !== prev.kf);
       var c = out.ctx; c.globalCompositeOperation = 'source-over';
-      if (key || !prev.used) { c.drawImage(fresh, 0, 0); prev.kf = Math.floor(view.t / 2.2); prev.used = true; }
+      if (key || !prev.used) { c.drawImage(fresh.canvas, 0, 0); prev.kf = Math.floor(view.t / 2.2); prev.used = true; }
       else {
-        c.drawImage(prev, 0, 0);
+        c.drawImage(prev.canvas, 0, 0);
         var mvx = Math.sin(view.t * 1.3) * bs * 0.6, mvy = Math.cos(view.t * 0.9) * bs * 0.4;
         for (var y = 0; y < S.h; y += bs) for (var x = 0; x < S.w; x += bs) {
-          var r = rnd(); if (r < 0.55) c.drawImage(prev, x - mvx * (0.5 + rnd()), y - mvy * (0.5 + rnd()), bs, bs, x, y, bs, bs);
-          else if (r < 0.62) c.drawImage(fresh, x, y, bs, bs, x, y, bs, bs);
+          var r = rnd(); if (r < 0.55) c.drawImage(prev.canvas, x - mvx * (0.5 + rnd()), y - mvy * (0.5 + rnd()), bs, bs, x, y, bs, bs);
+          else if (r < 0.62) c.drawImage(fresh.canvas, x, y, bs, bs, x, y, bs, bs);
         }
       }
-      prev.ctx.globalCompositeOperation = 'source-over'; prev.ctx.drawImage(out, 0, 0);
-      ctx.drawImage(out, 0, 0);
+      prev.ctx.globalCompositeOperation = 'source-over'; prev.ctx.drawImage(out.canvas, 0, 0);
+      ctx.drawImage(out.canvas, 0, 0);
     }
   };
 
@@ -88,11 +88,11 @@ const Skins: Record<string, Skin> = {};
       var fb = K.buffer('fb' + S.key, S.w, S.h), tmp = K.buffer('fbt' + S.key, S.w, S.h), c = tmp.ctx;
       c.globalCompositeOperation = 'source-over'; c.filter = 'none'; c.fillStyle = '#06040c'; c.fillRect(0, 0, S.w, S.h);
       c.save(); c.globalAlpha = 0.93; c.filter = 'hue-rotate(24deg) saturate(1.4)';
-      c.translate(S.w / 2, S.h / 2); c.rotate(0.03 * Math.sin(view.t * 0.4)); c.scale(1.045, 1.045); c.translate(-S.w / 2, -S.h / 2); c.drawImage(fb, 0, 0); c.restore();
+      c.translate(S.w / 2, S.h / 2); c.rotate(0.03 * Math.sin(view.t * 0.4)); c.scale(1.045, 1.045); c.translate(-S.w / 2, -S.h / 2); c.drawImage(fb.canvas, 0, 0); c.restore();
       var fresh = inner(S, view, tv('feedback.base', 'neon'), 'fb0', false);
-      c.drawImage(fresh, 0, 0);
-      fb.ctx.globalCompositeOperation = 'source-over'; fb.ctx.drawImage(tmp, 0, 0);
-      ctx.drawImage(tmp, 0, 0);
+      c.drawImage(fresh.canvas, 0, 0);
+      fb.ctx.globalCompositeOperation = 'source-over'; fb.ctx.drawImage(tmp.canvas, 0, 0);
+      ctx.drawImage(tmp.canvas, 0, 0);
     }
   };
 
@@ -113,7 +113,7 @@ const Skins: Record<string, Skin> = {};
       c.fillStyle = '#fff'; c.fillRect(wx + 4, wy + bar + 6, ww - 8, wh - bar - 10);
       drawn.sketch.draw(S, c, view);
       c.restore();
-      ctx.drawImage(buf, 0, 0);
+      ctx.drawImage(buf.canvas, 0, 0);
     }
   };
 
@@ -124,13 +124,13 @@ const Skins: Record<string, Skin> = {};
     draw: function (S: Scene, ctx: Ctx2D, view: View) {
       var src = inner(S, view, tv('pixelwind.base', 'pencil'), 'pw0', false), u = S.unit, b = S.body, amt = K.clamp(tv('pixelwind.wind', 0.3), 0, 1);
       var rnd = K.rng(1234), bs = Math.max(3, Math.round(u * 0.018)), t = view.t, cut = b.x + b.w * (1.15 - amt * 1.3);
-      ctx.save(); ctx.beginPath(); ctx.rect(0, 0, cut, S.h); ctx.clip(); ctx.drawImage(src, 0, 0); ctx.restore();
+      ctx.save(); ctx.beginPath(); ctx.rect(0, 0, cut, S.h); ctx.clip(); ctx.drawImage(src.canvas, 0, 0); ctx.restore();
       var N = 260 + amt * 900;
       for (var i = 0; i < N; i++) {
         var sx = b.x - u * 0.35 + rnd() * (b.w + u * 0.7), sy = b.y - u * 0.2 + rnd() * (b.h + u * 0.4), sp = 0.4 + rnd();
         if (sx < cut - u * 0.15 * rnd()) continue;
         var life = ((t * 0.6 * sp + rnd()) % 1), dx = life * u * (1.2 + amt * 2), dy = -life * u * 0.25 * (rnd() - 0.3);
-        ctx.globalAlpha = 1 - life; ctx.drawImage(src, sx, sy, bs, bs, sx + dx, sy + dy, bs, bs);
+        ctx.globalAlpha = 1 - life; ctx.drawImage(src.canvas, sx, sy, bs, bs, sx + dx, sy + dy, bs, bs);
       }
       ctx.globalAlpha = 1;
     }
@@ -147,7 +147,7 @@ const Skins: Record<string, Skin> = {};
         var name = pool[(K.strHash('m' + i + ':' + step) >>> 0) % pool.length];
         var src = inner(S, Object.assign({}, view, { palette: 'rose' }), name, 'sm' + i, true), ya = i === 0 ? 0 : y0 + h * i / bands, yb = i === bands - 1 ? S.h : y0 + h * (i + 1) / bands;
         var dx = (K.hash(i + step * 7) - 0.5) * u * 0.08;
-        ctx.drawImage(src, 0, ya, S.w, yb - ya, dx, ya, S.w, yb - ya);
+        ctx.drawImage(src.canvas, 0, ya, S.w, yb - ya, dx, ya, S.w, yb - ya);
       }
     }
   };

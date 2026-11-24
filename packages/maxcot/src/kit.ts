@@ -205,11 +205,11 @@ export const K = {
   buffer(key: string, w: number, h: number): Buffer {
     let b = BUF[key];
     if (!b) {
-      const c = K.createCanvas(w, h) as unknown as Buffer;
-      c.ctx = c.getContext('2d', { willReadFrequently: true }) as Ctx2D;
-      b = BUF[key] = c;
+      // a wrapper, never properties on the canvas itself: some canvas implementations (Node) are sealed
+      const c = K.createCanvas(w, h) as HTMLCanvasElement;
+      b = BUF[key] = { canvas: c, ctx: c.getContext('2d', { willReadFrequently: true }) as Ctx2D };
     }
-    if (b.width !== w || b.height !== h) { b.width = w; b.height = h; }
+    if (b.canvas.width !== w || b.canvas.height !== h) { b.canvas.width = w; b.canvas.height = h; }
     return b;
   },
 
