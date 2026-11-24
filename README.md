@@ -3,6 +3,8 @@
 **A character animation studio drawn entirely in code.** One rig, 26 visual skins, 8
 actors and a film timeline, all driven by a score you write in bars and beats.
 
+**[▶ Open the live studio](https://shibli21.github.io/maxcot/)** · [all 26 skins](https://shibli21.github.io/maxcot/sheet.html?mode=skins) · [smallest example](https://shibli21.github.io/maxcot/example.html)
+
 ![Maxcot](media/social-preview.png)
 
 ![The studio playing its score](media/demo.gif)
