@@ -11,7 +11,29 @@
     "./film": "./src/film/index.js",
     "./score": "./src/score/index.js"
   },
-  "files": ["src", "README.md", "LICENSE"],
-  "repository": { "type": "git", "url": "git+https://github.com/shibli21/maxcot.git", "directory": "packages/maxcot" },
-  "keywords": ["animation", "character", "canvas", "procedural", "generative", "mascot", "rig"]
+  "files": [
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/shibli21/maxcot.git",
+    "directory": "packages/maxcot"
+  },
+  "keywords": [
+    "animation",
+    "character",
+    "canvas",
+    "procedural",
+    "generative",
+    "mascot",
+    "rig"
+  ],
+  "devDependencies": {
+    "vitest": "^5.1.1"
+  },
+  "scripts": {
+    "test": "vitest run"
+  }
 }

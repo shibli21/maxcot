@@ -6,12 +6,15 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "record": "bun scripts/record.mjs"
+    "record": "bun scripts/record.mjs",
+    "test": "playwright test",
+    "test:update": "playwright test --update-snapshots"
   },
   "dependencies": {
     "maxcot": "workspace:*"
   },
   "devDependencies": {
+    "@playwright/test": "^1.65.1",
     "puppeteer-core": "^25.18.1",
     "vite": "^8.3.8"
   }
