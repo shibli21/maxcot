@@ -2,7 +2,9 @@
 // Skins live in 'maxcot/skins', films in 'maxcot/film', scores in 'maxcot/score'.
 import K from './kit.js';
 
-export { Character, create as createCharacter, render, scene, camera } from './character.js';
+export { Character, create as createCharacter, render, paint, mergeScenes, scene, camera } from './character.js';
+export { Stage, createStage } from './stage.js';
+export type { StageMember, StageCastSpec, StageFraming, StageOptions, StageShot } from './stage.js';
 export type { CharacterOptions, RenderOptions, SceneView } from './character.js';
 export { Actor, P as POSES, SECTIONS as POSE_SECTIONS, resolve as resolvePose, CH as CHANNELS } from './rig.js';
 export type { ActorOptions, PoseDef, PoseSection, PoseValues, ResolvedPose } from './rig.js';

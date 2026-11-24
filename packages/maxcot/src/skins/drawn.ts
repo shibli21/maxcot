@@ -26,8 +26,9 @@ const Skins: Record<string, Skin> = {};
       },
       pre: function (c, p, S) {
         if (p.role !== 'front' || tv('pencil.hatch', 1) < 0.05) return;
-        if (o.sidesOnly) { S.facets.forEach(function (f) { if (f.shade! < 0.55) K.hatch(c, f.pts, { angle: -0.95, gap: Math.max(2.2, u * 0.018), width: lw * 0.55, color: ink, alpha: 0.4, rnd: rnd }); }); return; }
-        K.hatch(c, S.sil,{ angle: -0.95, gap: Math.max(2.2, u * 0.018 / tv('pencil.hatch', 1)), width: lw * 0.55, color: ink, alpha: 0.45, rnd: rnd });
+        var A = K.sceneOf(S, p);
+        if (o.sidesOnly) { A.facets.forEach(function (f) { if (f.shade! < 0.55) K.hatch(c, f.pts, { angle: -0.95, gap: Math.max(2.2, u * 0.018), width: lw * 0.55, color: ink, alpha: 0.4, rnd: rnd }); }); return; }
+        K.hatch(c, A.sil,{ angle: -0.95, gap: Math.max(2.2, u * 0.018 / tv('pencil.hatch', 1)), width: lw * 0.55, color: ink, alpha: 0.45, rnd: rnd });
       },
       texture: function (c, p) {
         if (p.fill === 'brow' || p.fill === 'pupil') K.hatch(c, p.pts, { angle: 0.7, gap: Math.max(1.5, u * 0.006), width: lw * 0.5, color: '#000', alpha: 0.5, rnd: rnd });
@@ -78,8 +79,9 @@ const Skins: Record<string, Skin> = {};
         },
         pre: function (c, p, S) {
           if (p.role !== 'front') return;
-          K.hatch(c, S.sil, { angle: -0.9, gap: Math.max(2, u * 0.014), width: lw * 0.6, color: ink, alpha: 0.6, rnd: rnd });
-          S.facets.forEach(function (f) { if (f.shade! < 0.32) K.hatch(c, f.pts, { angle: 0.6, gap: Math.max(2, u * 0.016), width: lw * 0.5, color: ink, alpha: 0.5, rnd: rnd }); });
+          var A = K.sceneOf(S, p);
+          K.hatch(c, A.sil, { angle: -0.9, gap: Math.max(2, u * 0.014), width: lw * 0.6, color: ink, alpha: 0.6, rnd: rnd });
+          A.facets.forEach(function (f) { if (f.shade! < 0.32) K.hatch(c, f.pts, { angle: 0.6, gap: Math.max(2, u * 0.016), width: lw * 0.5, color: ink, alpha: 0.5, rnd: rnd }); });
         },
         line: function (c, pts, closed, p) { K.sketch(c, pts, { closed: closed, rnd: rnd, amp: u * 0.003, width: lw * (p.lw || 1), color: ink, passes: p.fat ? 1 : 3, over: 0.2, step: Math.max(4, u * 0.02), alpha: 0.9 }); }
       });
@@ -113,16 +115,19 @@ const Skins: Record<string, Skin> = {};
     name: 'inkbleed', label: 'Ink bleed', group: 'drawn', about: 'Wet watercolour that won’t stay inside a dip-pen line.',
     fps: 6, hold: 'skin', ground: { css: '#f7f3ea', draw: function (ctx: Ctx2D, w: number, h: number) { K.paper(ctx, w, h, '#f7f3ea', 1.4); } },
     draw: function (S: Scene, ctx: Ctx2D) {
-      var rnd = K.rng(S.seed * 13 + 9), u = S.unit, b = S.body;
+      var rnd = K.rng(S.seed * 13 + 9), u = S.unit;
       var washes = ['#2d6cdf', '#20a39e', '#f4a259', '#5b8e7d', '#bc4b51', '#8cb369'];
       ctx.save(); ctx.globalCompositeOperation = 'multiply'; ctx.filter = 'blur(' + Math.max(1, u * 0.012).toFixed(1) + 'px)';
-      K.withClip(ctx, S.sil.map(function (q) { return [q[0] + (q[0] - b.cx) * 0.06, q[1] + (q[1] - b.cy) * 0.06]; }), function () {
+      K.actorsOf(S).forEach(function (A) {
+      var b = A.body;
+      K.withClip(ctx, A.sil.map(function (q): Pt { return [q[0] + (q[0] - b.cx) * 0.06, q[1] + (q[1] - b.cy) * 0.06]; }), function () {
         for (var i = 0; i < 7; i++) {
-          ctx.fillStyle = K.rgba(washes[i % washes.length], 0.45);
-          ctx.beginPath(); ctx.arc(b.x + rnd() * b.w, b.y + rnd() * b.h, u * (0.18 + rnd() * 0.25), 0, K.TAU); ctx.fill();
+          ctx.fillStyle = K.rgba(washes[i % washes.length]!, 0.45);
+          ctx.beginPath(); ctx.arc(b.x + rnd() * b.w, b.y + rnd() * b.h, A.unit * (0.18 + rnd() * 0.25), 0, K.TAU); ctx.fill();
         }
       });
-      (['handL', 'handR'] as const).forEach(function (k) { var hh = S[k]; if (!hh) return; ctx.fillStyle = K.rgba(washes[k === 'handL' ? 4 : 2]!, 0.6); ctx.beginPath(); ctx.arc(hh.x + u * 0.01, hh.y, hh.r * 0.6, 0, K.TAU); ctx.fill(); });
+      (['handL', 'handR'] as const).forEach(function (k) { var hh = A[k]; if (!hh) return; ctx.fillStyle = K.rgba(washes[k === 'handL' ? 4 : 2]!, 0.6); ctx.beginPath(); ctx.arc(hh.x + u * 0.01, hh.y, hh.r * 0.6, 0, K.TAU); ctx.fill(); });
+      });
       ctx.restore();
       K.toon(S, ctx, {
         fill: function (p) { return ({ pupil: '#1b1b2f', brow: '#1b1b2f', mouth: '#3a1c2c', tongue: '#d9667a', eyeWhite: 'rgba(255,255,255,0.85)', teeth: '#fff', glint: '#fff', shadow: 'rgba(40,40,80,0.12)', tear: 'rgba(45,108,223,0.5)', heart: '#bc4b51', blush: 'rgba(230,90,100,0.4)' } as Pal)[p.fill!] || null; },

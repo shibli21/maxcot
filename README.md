@@ -77,7 +77,20 @@ after `#`, which browsers never send to a server, so a full tour fits in about 2
 edits are kept as a local draft and come back after a reload. Files and links are read as data and
 checked field by field, so opening one from someone else can't run code.
 
-Each verb (`create`, `style`, `pose`, `who`, `set`, `play`, `camera`, `end` and the rest) is
+**More than one actor.** `enter` brings someone on stage, `on:` says who a command is for,
+`look` turns one actor toward another, and `shot` moves the camera:
+
+```js
+{ at: [2, 1], enter: { id: 'kid', who: 'child' } },
+{ at: [2, 2], look: 'max', on: 'kid' },
+{ at: [3, 1], shot: 'close', on: 'kid' },
+{ at: [5, 1], shot: 'wide' },
+```
+
+Open **Demos → Ensemble** in the studio to see a three-actor scene. Click an actor to make
+the panels edit it.
+
+Each verb (`create`, `enter`, `exit`, `shot`, `look`, `style`, `pose`, `who`, `set`, `play`, `camera`, `end` and the rest) is
 one function in the studio's `CMD` table, and the UI calls the same functions, so anything
 the score can do, you can do by hand.
 
@@ -105,12 +118,13 @@ packages/maxcot/src/
   design.ts          DESIGN (one row per dial) and CAST (actors as overrides)
   rig.ts             channels, layers, pose libraries, the spring-driven Actor
   character.ts       Actor → Scene, render(), the Character class
+  stage.ts           a cast on one canvas: shared camera, looks, merged scenes
   skins/             26 skins in 5 groups
   film/film.ts       film Player and timeline Editor
   score/conductor.ts bars-and-beats sequencer with seek-by-replay
 apps/studio/src/
   main.ts            views, panels, code panes, transport, the CMD table
-  scores/tour.score  the showcase, as data
+  scores/*.score     the demos (tour, ensemble), as data
   hello.ts           the 13-second film
   beat.ts            the WebAudio drum machine
 ```

@@ -44,6 +44,8 @@ export interface Part {
   z?: number;
   normal?: number[];
   accent?: number;
+  /** In a merged (multi-actor) scene: which actor this part belongs to. */
+  actor?: number;
 }
 
 export interface Camera { cx: number; cy: number; unit: number }
@@ -67,6 +69,8 @@ export interface Scene {
   front: Pt[]; sil: Pt[]; body: Box; facets: Part[]; mesh: MeshLine[];
   handL?: HandInfo; handR?: HandInfo;
   palette?: string; key: string; style?: string;
+  /** A merged scene (several actors) keeps each actor's own scene here. */
+  actors?: Scene[];
 }
 
 /** Per-draw information a skin gets besides the scene. */

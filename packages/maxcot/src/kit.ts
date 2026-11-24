@@ -263,6 +263,11 @@ export const K = {
     if (st.after) st.after(ctx, S);
   },
 
+  /** The scene of the actor a part belongs to (a merged scene keeps one per actor). */
+  sceneOf(S: Scene, p: Part): Scene { return (S.actors && p.actor != null && S.actors[p.actor]) || S; },
+  /** Every actor's own scene: just [S] for a single actor. */
+  actorsOf(S: Scene): Scene[] { return S.actors || [S]; },
+
   /** Palette lookup most colour skins share: shaded fills for body, sides and hands. */
   paint(pal: Palette, part: Part): string | null {
     const c = part.fill ? pal[part.fill] : undefined; if (c == null) return null;

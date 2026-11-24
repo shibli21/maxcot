@@ -71,7 +71,7 @@ const Skins: Record<string, Skin> = {};
           if (p.fill === 'side') return K.rgba(blue, (1 - p.shade!) * 0.55);
           return ({ pupil: blue, brow: blue, mouth: blue, shadow: K.rgba(blue, 0.35), tear: K.rgba(blue, 0.5) } as Pal)[p.fill!] || null;
         },
-        texture: function (c, p) { if (p.role === 'front') K.halftone(c, p.pts, { cell: Math.max(3, u * 0.022), color: blue, size: function (x, y) { return 0.12 + 0.25 * (y - S.body.y) / S.body.h; } }); }
+        texture: function (c, p) { if (p.role === 'front') K.halftone(c, p.pts, { cell: Math.max(3, u * 0.022), color: blue, size: function (x, y) { return 0.12 + 0.25 * (y - K.sceneOf(S, p).body.y) / K.sceneOf(S, p).body.h; } }); }
       });
       // grain: knock speckles out of both drums
       [A, Bf].forEach(function (buf) {
@@ -141,7 +141,7 @@ const Skins: Record<string, Skin> = {};
       });
       ctx.save();
       ctx.fillStyle = 'rgba(214,40,40,0.82)'; ctx.filter = 'blur(' + (u * 0.006).toFixed(1) + 'px)';
-      K.path(ctx, S.front, true); ctx.fill(); ctx.filter = 'none';
+      K.actorsOf(S).forEach(function (Q) { K.path(ctx, Q.front, true); ctx.fill(); }); ctx.filter = 'none';
       ctx.globalAlpha = 0.35; ctx.filter = 'blur(' + (u * 0.012).toFixed(1) + 'px)'; ctx.drawImage(A.canvas, 0, 0);
       ctx.filter = 'none'; ctx.globalAlpha = 1; ctx.drawImage(A.canvas, 0, 0);
       // speckle overspray
@@ -149,7 +149,9 @@ const Skins: Record<string, Skin> = {};
       for (var i = 0; i < 500; i++) { var a = rnd() * K.TAU, r = Math.hypot(S.body.w, S.body.h) * (0.45 + rnd() * 0.25); ctx.fillRect(S.body.cx + Math.cos(a) * r, S.body.cy + Math.sin(a) * r * 0.8, 1.2, 1.2); }
       // drips
       ctx.fillStyle = 'rgba(20,20,20,0.75)';
-      for (var d = 0; d < 3; d++) { var x = S.body.x + S.body.w * (0.2 + d * 0.3), y = S.body.y + S.body.h * 0.98, len = u * (0.06 + K.hash(d + 9) * 0.12); ctx.fillRect(x, y, Math.max(1.5, u * 0.006), len); ctx.beginPath(); ctx.arc(x + u * 0.003, y + len, u * 0.006, 0, K.TAU); ctx.fill(); }
+      K.actorsOf(S).forEach(function (Q) { var qb = Q.body;
+      for (var d = 0; d < 3; d++) { var x = qb.x + qb.w * (0.2 + d * 0.3), y = qb.y + qb.h * 0.98, len = u * (0.06 + K.hash(d + 9) * 0.12); ctx.fillRect(x, y, Math.max(1.5, u * 0.006), len); ctx.beginPath(); ctx.arc(x + u * 0.003, y + len, u * 0.006, 0, K.TAU); ctx.fill(); }
+      });
       ctx.restore();
     }
   };

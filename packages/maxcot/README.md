@@ -12,7 +12,7 @@ Strict TypeScript, ES modules, zero runtime dependencies. Four entry points:
 
 | Import | What it gives you |
 |---|---|
-| `maxcot` | `createCharacter`, `Actor`, `render`, `scene`, poses, the design table, the cast |
+| `maxcot` | `createCharacter`, `createStage`, `Actor`, `render`, `scene`, poses, the design table, the cast |
 | `maxcot/skins` | the 26 skins as plain objects, plus `allSkins` and `skinsByName` |
 | `maxcot/film` | `Player` (shots, beats, who/style tracks, cameras), a DOM timeline `Editor`, `card` |
 | `maxcot/score` | `createConductor`: sequence anything in bars and beats, with exact seeking |
@@ -36,6 +36,31 @@ game loop, or deterministic frames for video), pass `autoplay: false` and call
 `max.step(dt)`.
 
 Only the skins you import end up in your bundle.
+
+## A cast on one stage
+
+```ts
+import { createStage } from 'maxcot';
+import { felttip } from 'maxcot/skins';
+
+const stage = createStage(canvas, { skin: felttip, cast: [
+  { id: 'max' },
+  { id: 'kid', who: 'child', pose: 'feel-happy' },
+  { id: 'boss', who: 'boss', z: 1.2 }            // further back
+] });
+
+stage.look('kid', 'max').look('max', 'kid');     // they turn to each other
+stage.pose('boss', 'feel-furious');
+stage.shot('close', 'kid');                       // the camera eases in on the kid
+stage.shot('wide');                               // and back out to everyone
+```
+
+Actors stand on a floor (`x` across, `z` into the picture) and share one camera:
+`'wide'` frames the whole cast (or a group: `shot('wide', ['max', 'kid'])`), and `'full'`,
+`'medium'` and `'close'` frame one actor. Every actor's scene is merged before painting,
+so a skin draws the cast in one pass and whole-frame effects treat it as one picture.
+A cast of one looks exactly like `createCharacter`. `stage.pick(x, y)` tells you who is
+under a point.
 
 ## Poses, actors and dials
 

@@ -1,0 +1,59 @@
+// ensemble.score: three actors, one camera.
+// `enter` brings someone on, `on:` says who a command is for,
+// `look` turns one actor toward another, `shot` moves the camera.
+{
+  title: 'Ensemble',
+  bpm: 100,
+  tail: 3,
+  events: [
+    { at: [1, 1], create: 'max' },
+    { at: [1, 1.5], style: 'pencil' },
+    { at: [1, 2], pose: 'wave' },
+    { at: [1, 4], look: 'us' },
+    // bar 2: the kid arrives
+    { at: [2, 1], enter: { id: 'kid', who: 'child' } },
+    { at: [2, 2], look: 'kid' },
+    { at: [2, 2.5], look: 'max', on: 'kid' },
+    { at: [2, 3], pose: 'feel-happy', on: 'kid' },
+    { at: [2, 4], pose: 'pleased' },
+    // bar 3: close on the kid, who has a secret
+    { at: [3, 1], shot: 'close', on: 'kid' },
+    { at: [3, 2], pose: 'secret', on: 'kid' },
+    { at: [3, 4], pose: 'eyes-suspicious', on: 'kid' },
+    // bar 4: Max takes it in
+    { at: [4, 1], shot: 'close', on: 'max' },
+    { at: [4, 2], pose: 'feel-surprised' },
+    { at: [4, 4], pose: 'laughing' },
+    // bar 5: the boss
+    { at: [5, 1], shot: 'wide' },
+    { at: [5, 2], enter: { id: 'boss', who: 'boss', z: 1.2 } },
+    { at: [5, 3], look: 'boss' },
+    { at: [5, 3], look: 'boss', on: 'kid' },
+    { at: [5, 4], pose: 'fedup', on: 'boss' },
+    { at: [6, 1], style: 'felttip' },
+    { at: [6, 2], pose: 'feel-terrified', on: 'kid' },
+    { at: [6, 3], pose: 'dunno' },
+    // bar 7: the boss has words
+    { at: [7, 1], shot: 'medium', on: 'boss' },
+    { at: [7, 2], look: 'max', on: 'boss' },
+    { at: [7, 3], pose: 'feel-furious', on: 'boss' },
+    { at: [8, 1], shot: 'wide' },
+    { at: [8, 1.5], style: 'riso' },
+    { at: [8, 2], pose: 'feel-embarrassed' },
+    { at: [8, 3], pose: 'point-you', on: 'kid' },
+    // bar 9: everyone to camera
+    { at: [9, 1], look: 'us' },
+    { at: [9, 1], look: 'us', on: 'kid' },
+    { at: [9, 1], look: 'us', on: 'boss' },
+    { at: [9, 2], pose: 'wave' },
+    { at: [9, 2], pose: 'wave', on: 'kid' },
+    { at: [9, 2.5], pose: 'thumbsup', on: 'boss' },
+    { at: [10, 1], style: 'hologram', palette: 'cyan' },
+    { at: [10, 3], style: 'neon' },
+    { at: [11, 1], style: 'gigposter' },
+    { at: [11, 1], pose: 'feel-excited' },
+    { at: [11, 1], pose: 'feel-excited', on: 'kid' },
+    { at: [11, 1], pose: 'cheer', on: 'boss' },
+    { at: [12, 1], end: { card: 'logo', text: 'ENSEMBLE' } }
+  ]
+}

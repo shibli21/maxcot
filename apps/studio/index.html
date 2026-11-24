@@ -9,7 +9,7 @@
 <div id="app">
   <aside id="code">
     <section class="pane" id="scorePane">
-      <header><span id="scoreFile">apps/studio/src/scores/tour.score</span><span id="scoreStatus"></span><button id="bRevert" title="Throw away your edits and go back to the tour">Revert</button></header>
+      <header><span id="scoreFile">apps/studio/src/scores/tour.score</span><span id="scoreStatus"></span><button id="bRevert" title="Undo your edits; press again to go back to the tour">Revert</button></header>
       <div class="editor"><div class="src hl" id="scoreHl"></div><textarea id="scoreEdit" spellcheck="false" autocomplete="off" autocapitalize="off" wrap="off" aria-label="Score editor"></textarea></div>
     </section>
     <section class="pane" id="enginePane"><header id="engineFile">engine/character.js</header><div class="src" id="engineSrc"></div></section>
@@ -45,6 +45,7 @@
       <label><input type="checkbox" id="cCode" checked> Code</label>
       <button id="bPanel" title="Open the studio panel">Panel</button>
       <span class="sep"></span>
+      <select id="demo" title="Open a demo"><option value="">Demos…</option></select>
       <button id="bOpen" title="Open a .maxcot.json project">Open</button>
       <button id="bSave" title="Download this project as a .maxcot.json file">Save</button>
       <button id="bShare" title="Copy a link that opens this project">Share</button>

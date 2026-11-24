@@ -43,13 +43,15 @@ const Skins: Record<string, Skin> = {};
       var flick = 0.85 + 0.15 * Math.sin(t * 37) * Math.sin(t * 13), grad: string | CanvasGradient = c0;
       if (foil) { var lg = ctx.createLinearGradient(b.x, b.y, b.x + b.w, b.y + b.h); lg.addColorStop(0, c0); lg.addColorStop(0.5 + 0.3 * Math.sin(t), c1); lg.addColorStop(1, c0); grad = lg; }
       ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = flick;
-      // base projector rings
-      var sh = S.parts[0], sb = K.bbox(sh.pts);
+      // per actor: base projector rings, a beam and the lit volume
+      K.actorsOf(S).forEach(function (A) {
+      var sh = A.parts.find(function (p) { return p.role === 'shadow'; }) || A.parts[0]!, sb = K.bbox(sh.pts), b = A.body, u = A.unit;
       for (var r = 0; r < 4; r++) { ctx.strokeStyle = K.rgba(c0, 0.5 - r * 0.1); ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(sb.cx, sb.cy, sb.w * (0.25 + r * 0.14), sb.h * (0.25 + r * 0.14), 0, 0, K.TAU); ctx.stroke(); }
       var beam = ctx.createLinearGradient(0, sb.cy, 0, b.y); beam.addColorStop(0, K.rgba(c0, 0.18)); beam.addColorStop(1, K.rgba(c0, 0));
       ctx.fillStyle = beam; ctx.beginPath(); ctx.moveTo(sb.x + sb.w * 0.2, sb.cy); ctx.lineTo(b.x - u * 0.05, b.y); ctx.lineTo(b.x + b.w + u * 0.05, b.y); ctx.lineTo(sb.x + sb.w * 0.8, sb.cy); ctx.fill();
       // volume
-      ctx.fillStyle = foil ? grad : K.rgba(c0, 0.08); ctx.globalAlpha = flick * (foil ? 0.18 : 1); K.path(ctx, S.sil, true); ctx.fill(); ctx.globalAlpha = flick;
+      ctx.fillStyle = foil ? grad : K.rgba(c0, 0.08); ctx.globalAlpha = flick * (foil ? 0.18 : 1); K.path(ctx, A.sil, true); ctx.fill(); ctx.globalAlpha = flick;
+      });
       ctx.shadowColor = c0; ctx.shadowBlur = u * 0.04; ctx.strokeStyle = foil ? grad : K.rgba(c0, 0.55); ctx.lineWidth = Math.max(1, u * 0.003);
       S.mesh.forEach(function (m) { K.path(ctx, m.pts, false); ctx.stroke(); });
       ctx.lineWidth = Math.max(1.2, u * 0.006); ctx.strokeStyle = foil ? grad : c0;

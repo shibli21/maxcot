@@ -2,7 +2,7 @@
 // the side panel (Styles, Tune, Poses, Design, Motion), the two code panes and
 // the transport. Every score command lands in CMD below; the UI calls the same
 // functions, so anything the score can do, a person can do by hand.
-import { kit as K, Actor, Character, CAST, DESIGN, POSES, POSE_SECTIONS, render, type DesignRow, type DesignValues, type Skin } from 'maxcot';
+import { kit as K, Actor, Character, Stage, CAST, DESIGN, POSES, POSE_SECTIONS, render, type DesignRow, type DesignValues, type Skin, type StageFraming } from 'maxcot';
 import { GROUPS, allSkins, skinsByName } from 'maxcot/skins';
 import { Editor, Player, card, type Film, type StyleSegment, type TrackName, type WhoSegment } from 'maxcot/film';
 import { createConductor, parseScore, type CommandContext, type Conductor, type ScheduledEvent, type ScoreEvent } from 'maxcot/score';
@@ -33,6 +33,8 @@ interface StudioState {
   card: { text: string; start: number } | null; pointer: { start: number } | null;
   clock: number; rev: number; revAt: number; panelRev: number; created: boolean;
   src: [string, string?] | null; instant?: boolean;
+  /** Who score commands without `on:` are for, and who the panels edit. */
+  lead: string; selected: string;
 }
 interface Tile { h: Character; shared: boolean; anim: boolean; c: HTMLCanvasElement }
 interface TileOptions { actor: Actor; style: string; palette?: string; shared?: boolean; isStatic?: boolean; frame?: string; key: string; dpr?: number }
@@ -59,7 +61,8 @@ let film: Player | null = null, editor: Editor | null = null;
 let tiles: Tile[] = [], tilesSig = '';
 let thumbQ: Array<[HTMLCanvasElement, ThumbSpec]> = [], thumbId = 0;
 let bts: Conductor;
-const mainH = new Character($<HTMLCanvasElement>('#main'), { skin: skin('pencil'), key: 'main', autoplay: false });
+const stage = new Stage($<HTMLCanvasElement>('#main'), { skin: skin('pencil'), key: 'main', autoplay: false });
+function useStageSkin(name: string): void { if (stage.skin.name !== name) { stage.skin = skin(name); stage.dirty = true; } }
 
 /** Switch a character's skin by name, redrawing only when it really changes. */
 function useSkin(h: Character, name: string): void { if (h.skin.name !== name) { h.skin = skin(name); h.dirty = true; } }
@@ -69,9 +72,10 @@ function reset(): void {
   ST = {
     actor: new Actor({ who: 'max' }), style: 'pencil', palette: 'cyan', guides: false, mode: 'single',
     sizesUpTo: 48, grid: 3, sheetKind: 'styles', dealSeed: 0, faces: 1, panel: null, editRow: null, multicam: false,
-    card: null, pointer: null, clock: ST.clock || 0, rev: 0, revAt: 0, panelRev: -1, created: false, src: null
+    card: null, pointer: null, clock: ST.clock || 0, rev: 0, revAt: 0, panelRev: -1, created: false, src: null,
+    lead: 'max', selected: 'max'
   };
-  mainH.actor = ST.actor; K.tune = {};
+  castOnly('max', ST.actor); K.tune = {};
   film = null; editor = null; $('#timeline').innerHTML = ''; $('#pointer').style.display = 'none';
   $('#panel').classList.remove('on'); setMode('single');
 }
@@ -81,14 +85,42 @@ function settle(): void {
   if (bts.last >= 0) hiScore(bts.last);
   if (ST.src) showSource(ST.src[0], ST.src[1]);
   if (ST.panel) openPanel(ST.panel); else closePanel();
+  stage.cut();
   layout();
+}
+/** Empty the stage and put one actor on it. */
+function castOnly(id: string, actor: Actor): void {
+  stage.members.slice().forEach((m) => stage.remove(m.id));
+  stage.add({ id, actor, x: 0 }); stage.shot('wide', undefined, true);
+}
+/** The actor a command is for: `on:` if given, otherwise the lead. */
+function actorFor(ev: Record<string, unknown>): Actor {
+  const id = ev.on != null ? String(ev.on) : ST.lead;
+  return stage.has(id) ? stage.get(id) : ST.actor;
+}
+/** Make an actor the one the panels edit (clicking an actor on stage does this). */
+function selectActor(id: string): void {
+  if (!stage.has(id)) return;
+  ST.selected = id; ST.actor = stage.get(id); bump();
+  if (ST.panel) openPanel(ST.panel);
 }
 
 // ── commands: one per score verb ─────────────────────────────────────────
 const str = (v: unknown) => String(v), num = (v: unknown) => Number(v);
 const needFilm = (): Player => { ensureFilm(); return film!; };
 const CMD: Record<string, Command> = {
-  create(v) { ST.actor = new Actor({ who: str(v) }); mainH.actor = ST.actor; ST.created = true; setMode('single'); src('create'); },
+  create(v) { const id = str(v); ST.actor = new Actor({ who: id }); castOnly(id, ST.actor); ST.lead = ST.selected = id; ST.created = true; setMode('single'); src('create'); },
+  enter(v, ev) {
+    const o = (typeof v === 'string' ? { id: v } : (v || {})) as { id?: string; who?: string; x?: number; z?: number; pose?: string };
+    const id = String(o.id || o.who || 'guest');
+    if (!stage.has(id)) stage.add({ id, who: o.who || id, x: o.x, z: o.z, pose: o.pose });
+    if (ev.on == null && stage.shotSpec.frame === 'wide') stage.shot('wide');
+    leaveSpecial(); src('stage');
+  },
+  exit(v) { const id = str(v); if (stage.has(id) && stage.members.length > 1) stage.remove(id); if (ST.selected === id) selectActor(ST.lead); src('stage'); },
+  shot(v, ev) { stage.shot(str(v) as StageFraming, ev.on as string | string[] | undefined, !!ev.cut); leaveSpecial(); src('stage'); },
+  place(v, ev) { const id = ev.on != null ? String(ev.on) : ST.lead, at = Array.isArray(v) ? v : [v]; if (stage.has(id)) stage.place(id, num(at[0]), at[1] != null ? num(at[1]) : undefined); src('stage'); },
+  spread() { stage.spread(); src('stage'); },
   style(v, ev) {
     const name = str(v), palette = ev.palette as string | undefined;
     if (ST.mode === 'film' && ST.editRow === 'style' && editor) { editor.assign(name); markPicker(name); }
@@ -100,13 +132,18 @@ const CMD: Record<string, Command> = {
     }
     src('style', name);
   },
-  look(v) { const s = str(v); if (s === 'code') ST.guides = true; else if (s === 'clean') ST.guides = false; else ST.actor.gaze = s; src('look'); },
+  look(v, ev) {
+    const s = str(v);
+    if (s === 'code') ST.guides = true; else if (s === 'clean') ST.guides = false;
+    else { const id = ev.on != null ? String(ev.on) : ST.lead; if (stage.has(id)) stage.look(id, s === 'none' ? null : s); else ST.actor.gaze = s; }
+    src('look');
+  },
   open(v) { setMode('single'); openPanel(str(v) as Panel); },
-  pose(v) { leaveSpecial(); ST.actor.pose(str(v)); markPanel('pose', str(v)); src('pose', str(v)); },
-  who(v) {
+  pose(v, ev) { leaveSpecial(); actorFor(ev).pose(str(v)); stage.dirty = true; markPanel('pose', str(v)); src('pose', str(v)); },
+  who(v, ev) {
     const who = str(v);
     if (ST.mode === 'film' && ST.editRow === 'who' && editor) { editor.assign(who); markPicker(who); }
-    else { ST.actor.cast(who); bump(); markPanel('cast', who); }
+    else { actorFor(ev).cast(who); bump(); markPanel('cast', who); }
     src('who', who);
   },
   size(v) { if (num(v) >= 1000) setMode('single'); else { ST.sizesUpTo = num(v); setMode('sizes'); } src('size'); },
@@ -114,8 +151,8 @@ const CMD: Record<string, Command> = {
   grid(v) { ST.grid = num(v); setMode(ST.mode === 'deal' ? 'deal' : 'sheet'); },
   deal(v) { ST.dealSeed = num(v); setMode('deal'); src('deal'); },
   edit(v) { const f = needFilm(); ST.editRow = /style/i.test(str(v)) ? 'style' : 'who'; f.playing = false; ST.multicam = false; f.camOverride = null; setMode('film'); editor!.select(ST.editRow); src('film'); },
-  set(v, ev) { leaveSpecial(); if (ST.panel !== 'Design') openPanel('Design'); ST.actor.set(str(v), num(ev.to)); bump(); markPanel('dial', str(v)); src('set', str(v)); },
-  preset(v) { leaveSpecial(); if (ST.panel !== 'Design') openPanel('Design'); ST.actor.cast(str(v)); bump(); markPanel('cast', str(v)); src('who', str(v)); },
+  set(v, ev) { leaveSpecial(); if (ST.panel !== 'Design') openPanel('Design'); actorFor(ev).set(str(v), num(ev.to)); bump(); markPanel('dial', str(v)); src('set', str(v)); },
+  preset(v, ev) { leaveSpecial(); if (ST.panel !== 'Design') openPanel('Design'); actorFor(ev).cast(str(v)); bump(); markPanel('cast', str(v)); src('who', str(v)); },
   play(_v, ev, ctx) {
     const f = needFilm(); ST.editRow = null; ST.multicam = false; f.camOverride = null; setMode('film');
     f.seek(num(ev.from || 0) + ctx.since); f.playing = true; buildPicker(null); src('film');
@@ -160,7 +197,7 @@ function layout(): void {
   const area = $('#viewArea'), W = area.clientWidth, H = area.clientHeight;
   if (!W || !H) return;
   switch (ST.mode) {
-    case 'single': fit($<HTMLCanvasElement>('#main'), W, H); mainH.dirty = true; break;
+    case 'single': fit($<HTMLCanvasElement>('#main'), W, H); stage.dirty = true; break;
     case 'card': fit($<HTMLCanvasElement>('#cardCanvas'), W, H); break;
     case 'sizes': buildSizes(W, H); break;
     case 'sheet': case 'deal': case 'faces': buildGrid(W, H); break;
@@ -300,14 +337,14 @@ function buildPanel(): void {
   } else if (ST.panel === 'Poses') {
     (Object.keys(POSE_SECTIONS) as Array<keyof typeof POSE_SECTIONS>).forEach((s) => {
       const grid = section(body, SECTION_LABEL[s]!);
-      POSE_SECTIONS[s].forEach((p) => { thumbFig(grid, 'pose:' + p, p, { design: d, who: who, style: 'pencil', pose: p }, () => exec('pose', p)); });
+      POSE_SECTIONS[s].forEach((p) => { thumbFig(grid, 'pose:' + p, p, { design: d, who: who, style: 'pencil', pose: p }, () => exec('pose', p, { on: ST.selected } as Partial<ScheduledEvent>)); });
     });
   } else if (ST.panel === 'Design') {
     body.appendChild(el('h4', null, 'Who plays it'));
     const chips = el('div', 'chips'); body.appendChild(chips);
     CAST_ORDER.forEach((k) => {
       const ch = el('div', 'chip' + (k === who ? ' on' : '')), c = el('canvas'); c.width = 60; c.height = 60; ch.appendChild(c); ch.appendChild(document.createTextNode(CAST[k]!.label));
-      ch.dataset.k = 'cast:' + k; ch.onclick = () => exec('preset', k); chips.appendChild(ch); queueThumb(c, { who: k, style: 'pencil', frame: 'close' });
+      ch.dataset.k = 'cast:' + k; ch.onclick = () => exec('preset', k, { on: ST.selected } as Partial<ScheduledEvent>); chips.appendChild(ch); queueThumb(c, { who: k, style: 'pencil', frame: 'close' });
     });
     const groups: Record<string, DesignRow[]> = {}; DESIGN.forEach((r) => { (groups[r[1]] = groups[r[1]] || []).push(r); });
     Object.keys(groups).forEach((g) => {
@@ -316,7 +353,7 @@ function buildPanel(): void {
     });
   } else if (ST.panel === 'Tune') {
     const sk = skin(ST.style); body.appendChild(el('h4', null, sk.label)); body.appendChild(el('p', 'note', sk.about));
-    (sk.params || []).forEach((p) => { dial(body, 'tune:' + p[0], p[1], p[2], p[3], Number(K.tv(p[0], p[4])), '', (v) => { K.tune[p[0]] = v; mainH.dirty = true; }); });
+    (sk.params || []).forEach((p) => { dial(body, 'tune:' + p[0], p[1], p[2], p[3], Number(K.tv(p[0], p[4])), '', (v) => { K.tune[p[0]] = v; stage.dirty = true; }); });
     if (!(sk.params || []).length) body.appendChild(el('p', 'note', 'This skin has no dials of its own.'));
     if (sk.palettes) {
       body.appendChild(el('h4', null, 'Beam')); const pc = el('div', 'chips'); body.appendChild(pc);
@@ -375,7 +412,7 @@ function renderCode(host: HTMLElement, lines: string[], hi: number): void {
 function scrollCode(host: HTMLElement, i: number): void { const ln = host.children[i] as HTMLElement | undefined; if (ln) host.scrollTop = Math.max(0, ln.offsetTop - host.clientHeight * 0.32); }
 // ── the score editor: plain data, parsed (never run) and applied as you type ──
 interface Mark { line: number; level: 'error' | 'warn'; message: string }
-let scoreText = tourScore, scoreLineOf: number[] = [], marks: Mark[] = [], hiLine = -1, applyTimer = 0, pending = false;
+let baseText = tourScore, scoreText = tourScore, scoreLineOf: number[] = [], marks: Mark[] = [], hiLine = -1, applyTimer = 0, pending = false;
 const edTa = () => $<HTMLTextAreaElement>('#scoreEdit'), edHl = () => $('#scoreHl');
 /** `palette`, `to` and `from` qualify a command; `grid` does too when it rides along with `sheet`. */
 function commandsOf(e: ScoreEvent): string[] { return e.sheet ? ['sheet'] : Object.keys(e).filter((k) => ['at', 'palette', 'to', 'from', 'on'].indexOf(k) < 0); }
@@ -389,8 +426,8 @@ function renderScore(): void {
   const first = marks.find((m) => m.level === 'error') || marks[0], status = $('#scoreStatus');
   status.textContent = first
     ? (first.level === 'error' ? 'Line ' : 'Warning, line ') + (first.line + 1) + ': ' + first.message + (marks.length > 1 ? '  (+' + (marks.length - 1) + ' more)' : '')
-    : pending ? 'typing…' : scoreText === tourScore ? '' : 'playing your version';
-  status.className = first ? first.level : pending || scoreText === tourScore ? '' : 'ok';
+    : pending ? 'typing…' : scoreText === baseText ? '' : 'playing your version';
+  status.className = first ? first.level : pending || scoreText === baseText ? '' : 'ok';
   status.title = marks.map((m) => 'line ' + (m.line + 1) + ': ' + m.message).join('\n');
   syncScroll();
 }
@@ -421,12 +458,14 @@ const KNOWN: Record<string, Set<string>> = {
   pose: new Set(Object.keys(POSES)), style: new Set(Object.keys(SKINS)),
   who: new Set(Object.keys(CAST)), preset: new Set(Object.keys(CAST)), create: new Set(Object.keys(CAST)),
   set: new Set(DESIGN.map((r) => r[0])), open: new Set(['Styles', 'Tune', 'Poses', 'Design', 'Motion']),
-  edit: new Set(['Who plays it', 'Style'])
+  edit: new Set(['Who plays it', 'Style']), shot: new Set(['wide', 'full', 'medium', 'close'])
 };
 const PALETTES = new Set((skin('hologram').palettes || []).map((p) => p.name));
 /** Things that parse but won't do what the author meant: shown as warnings, the score still plays. */
 function validate(events: ScoreEvent[], lines: number[]): Mark[] {
   const out: Mark[] = [];
+  const castIds = new Set<string>(['max']);
+  events.forEach((e) => { if (e.create != null) castIds.add(String(e.create)); if (e.enter != null) castIds.add(typeof e.enter === 'string' ? e.enter : String((e.enter as { id?: string; who?: string }).id || (e.enter as { who?: string }).who)); });
   events.forEach((e, i) => {
     const line = lines[i]!;
     commandsOf(e).forEach((c) => {
@@ -434,6 +473,8 @@ function validate(events: ScoreEvent[], lines: number[]): Mark[] {
       const known = KNOWN[c], v = String(e[c]);
       if (known && !known.has(v)) { const n = nearest(v, known); out.push({ line, level: 'warn', message: 'no ' + c + " called '" + v + "'" + (n ? ", did you mean '" + n + "'?" : '') }); }
     });
+    if (e.on != null && !castIds.has(String(e.on))) out.push({ line, level: 'warn', message: "nobody called '" + e.on + "' has entered (use create or enter)" });
+    if (e.enter != null && typeof e.enter === 'object' && (e.enter as { who?: string }).who && !CAST[(e.enter as { who: string }).who]) out.push({ line, level: 'warn', message: "no actor called '" + (e.enter as { who: string }).who + "'" });
     if (e.palette != null && !PALETTES.has(String(e.palette))) out.push({ line, level: 'warn', message: "no palette called '" + e.palette + "'" });
     if (e.set != null && typeof e.to !== 'number') out.push({ line, level: 'warn', message: '`set` needs `to: <number>`' });
   });
@@ -460,8 +501,9 @@ function toast(msg: string, kind = ''): void {
 }
 function currentProject(): Project { return makeProject(scoreText, film ? film.film : filmData !== hello ? filmData : undefined); }
 function setLabel(label: string): void { $('#scoreFile').textContent = label; }
-function loadProject(p: Project, label: string): void {
-  filmData = p.film ? structuredClone(p.film) : hello;
+/** `base` is what Revert returns to: the loaded text itself, or the tour for a restored draft. */
+function loadProject(p: Project, label: string, base = p.score): void {
+  filmData = p.film ? structuredClone(p.film) : hello; baseText = base.replace(/\r\n?/g, '\n');
   setLabel(label);
   const ta = edTa(); ta.value = p.score; scoreText = ta.value; pending = false;
   clearTimeout(applyTimer); applyScore();
@@ -506,7 +548,7 @@ async function restoreProject(): Promise<void> {
   try {
     const saved = localStorage.getItem(DRAFT_KEY); if (!saved) return;
     const r = readProject(saved);
-    if (r.ok) { loadProject(r.project, 'draft: ' + r.project.title); toast('Restored your unsaved edits. Revert goes back to the tour.'); }
+    if (r.ok) { loadProject(r.project, 'draft: ' + r.project.title, tourScore); toast('Restored your unsaved edits. Revert goes back to the tour.'); }
   } catch { /* no storage */ }
 }
 
@@ -522,13 +564,28 @@ function initEditor(): void {
     else if (e.key === 'Escape') ta.blur();
   });
   $('#bRevert').onclick = () => {
-    filmData = hello; setLabel(TOUR_LABEL); if (location.hash) history.replaceState(null, '', location.pathname + location.search);
+    // first undo your edits to what you opened; pressed again, go back to the tour
+    if (scoreText !== baseText) { ta.value = baseText; scoreText = ta.value; pending = false; clearTimeout(applyTimer); applyScore(); return; }
+    filmData = hello; baseText = tourScore; setLabel(TOUR_LABEL); if (location.hash) history.replaceState(null, '', location.pathname + location.search);
     ta.value = tourScore; scoreText = ta.value; pending = false; clearTimeout(applyTimer); applyScore();
   };
   $('#bOpen').onclick = () => $<HTMLInputElement>('#fileOpen').click();
   $<HTMLInputElement>('#fileOpen').onchange = (e) => { const inp = e.target as HTMLInputElement, f = inp.files && inp.files[0]; if (f) void openFile(f); inp.value = ''; };
   $('#bSave').onclick = saveProject;
   $('#bShare').onclick = () => { void shareProject(); };
+  // every .score file in scores/ is a demo
+  const demos = import.meta.glob('./scores/*.score', { query: '?raw', import: 'default', eager: true }) as Record<string, string>;
+  const pick = $<HTMLSelectElement>('#demo');
+  Object.keys(demos).sort((a, b) => (a.includes('tour') ? -1 : b.includes('tour') ? 1 : a.localeCompare(b))).forEach((path) => {
+    const r = parseScore(demos[path]!), o = el('option', null, r.ok && r.score.title ? r.score.title : path); o.value = path; pick.appendChild(o);
+  });
+  pick.onchange = () => {
+    const path = pick.value; pick.value = ''; if (!path) return;
+    const text = demos[path]!.replace(/\r\n?/g, '\n'), was = bts.playing;
+    loadProject(makeProject(text), 'apps/studio/src/scores/' + path.split('/').pop());
+    bts.seek(0); if (was) bts.play();
+    toast('Opened the ' + (makeProject(text).title) + ' demo');
+  };
   renderScore();
 }
 function lit(o: unknown): string[] { return JSON.stringify(o, null, 2).replace(/"([A-Za-z_$][\w$]*)":/g, '$1:').replace(/"((?:[^"\\]|\\.)*)"/g, "'$1'").split('\n'); }
@@ -563,11 +620,11 @@ function showSource(kind: string, name?: string): void {
 // ── pointer gag ─────────────────────────────────────────────────────────
 function updatePointer(): void {
   const p = ST.pointer, ptr = $('#pointer'); if (!p || ST.mode !== 'single') { ptr.style.display = 'none'; return; }
-  const dt = ST.clock - p.start, area = $('#viewArea'), S = mainH.S, b = S ? S.body : { cx: area.clientWidth * DPR / 2, cy: area.clientHeight * DPR / 2 };
+  const dt = ST.clock - p.start, area = $('#viewArea'), S = stage.S, b = S ? S.body : { cx: area.clientWidth * DPR / 2, cy: area.clientHeight * DPR / 2 };
   const tx = b.cx / DPR, ty = b.cy / DPR, fx = area.clientWidth + 60, fy = area.clientHeight + 60, k = K.ease(dt / 0.45);
   const x = K.lerp(fx, tx, k), y = K.lerp(fy, ty, k), s = dt > 0.45 && dt < 0.58 ? 0.8 : 1;
   ptr.style.display = 'block'; ptr.style.transform = 'translate(' + x + 'px,' + y + 'px) scale(' + s + ')';
-  if (dt > 0.5) { if (ST.style !== 'pixelwind') ST.style = 'pixelwind'; K.tune['pixelwind.wind'] = K.clamp((dt - 0.5) / 0.5, 0, 1); mainH.dirty = true; }
+  if (dt > 0.5) { if (ST.style !== 'pixelwind') ST.style = 'pixelwind'; K.tune['pixelwind.wind'] = K.clamp((dt - 0.5) / 0.5, 0, 1); stage.dirty = true; }
 }
 
 // ── transport ────────────────────────────────────────────────────────────
@@ -606,6 +663,10 @@ function wire(): void {
     else if (e.key === 'Escape') closePanel();
     else if (e.key === 'g') ST.guides = !ST.guides;
   });
+  $('#main').addEventListener('click', (e) => {
+    const r = $('#main').getBoundingClientRect(), id = stage.pick((e.clientX - r.left) * DPR, (e.clientY - r.top) * DPR);
+    if (id && id !== ST.selected && stage.members.length > 1) { selectActor(id); toast('The panels now edit ' + id); }
+  });
   new ResizeObserver(() => { tilesSig = ''; layout(); }).observe($('#viewArea'));
 }
 
@@ -616,9 +677,12 @@ function loop(now: number): void { step(Math.min(0.1, (now - lastNow) / 1000)); 
 function step(dt: number): void {
   ST.clock += dt;
   try {
-    bts.tick(dt); ST.actor.update(dt); updatePointer();
+    bts.tick(dt);
+    stage.members.forEach((m) => m.actor.update(dt));
+    if (!stage.members.some((m) => m.actor === ST.actor)) ST.actor.update(dt);
+    updatePointer();
     const t = ST.clock;
-    if (ST.mode === 'single') { useSkin(mainH, ST.style); mainH.palette = ST.palette; mainH.guides = guidesFor(ST.style); mainH.draw(t); }
+    if (ST.mode === 'single') { useStageSkin(ST.style); stage.palette = ST.palette; stage.guides = guidesFor(ST.style); stage.updateCamera(dt); stage.draw(t); }
     else if (ST.mode === 'card') { if (t - lastCard > 1 / 12 && ST.card) { lastCard = t; const cc = $<HTMLCanvasElement>('#cardCanvas'); card(cc.getContext('2d')!, cc.width, cc.height, t - ST.card.start, ST.card.text); } }
     else if (ST.mode === 'film' && film) {
       const f = film; f.update(dt); editor!.sync();
@@ -660,7 +724,7 @@ if (!CAPTURE) requestAnimationFrame(loop);
 
 declare global { interface Window { Studio: unknown } }
 window.Studio = {
-  exec, step, openPanel, setMode, conductor: bts,
+  exec, step, openPanel, setMode, conductor: bts, stage,
   renderBeatWav: (sec: number) => Beat.render(bts.bpm, sec).then(Beat.wav64),
   project: () => currentProject(), loadProject, shareCode: () => encodeShare(currentProject()),
   setScore: (text: string) => { const ta = edTa(); ta.value = text; ta.dispatchEvent(new Event('input')); clearTimeout(applyTimer); applyScore(); },

@@ -423,16 +423,41 @@ export interface SceneView { w: number; h: number; cam: Camera; guides?: boolean
     var cam = o.cam || camera(F.P, w, h, o.frame || 'full', o.zoom);
     var fps = skin.fps || 12, seed = Math.floor(t * fps) + (o.seedOff || 0);
     var S = scene(F, { w: w, h: h, cam: cam, guides: o.guides, seed: seed });
+    return paint(ctx, S, skin, { t: t, palette: o.palette, key: o.key, ground: o.ground });
+  }
+
+  /** Paint an already-built scene (one actor, or several merged) with a skin. */
+  function paint(ctx: Ctx2D, S: Scene, skin: Skin, o: { t: number; palette?: string; key?: string; ground?: boolean }): Scene {
     S.palette = o.palette; S.key = o.key || 'main'; S.style = skin.name;
-    var view = { w: w, h: h, t: t, palette: o.palette, seed: seed, key: S.key };
+    var view = { w: S.w, h: S.h, t: o.t, palette: o.palette, seed: S.seed, key: S.key };
     if (o.ground !== false) {
       ctx.save();
-      if (skin.ground && skin.ground.draw) skin.ground.draw(ctx, w, h, t, K, view);
-      else { ctx.fillStyle = (skin.ground && skin.ground.css) || '#f3f2ec'; ctx.fillRect(0, 0, w, h); }
+      if (skin.ground && skin.ground.draw) skin.ground.draw(ctx, S.w, S.h, o.t, K, view);
+      else { ctx.fillStyle = (skin.ground && skin.ground.css) || '#f3f2ec'; ctx.fillRect(0, 0, S.w, S.h); }
       ctx.restore();
     }
     ctx.save(); skin.draw(S, ctx, view); ctx.restore();
     return S;
+  }
+
+  /**
+   * Merge several actors' scenes into one, so a skin paints them in a single pass
+   * (whole-frame effects like glitch then treat the cast as one picture).
+   * Scenes go far to near; every shadow is drawn first.
+   */
+  function mergeScenes(scenes: Scene[]): Scene {
+    if (scenes.length === 1) return scenes[0]!;
+    var shadows: Part[] = [], rest: Part[] = [], all: Pt[] = [];
+    scenes.forEach(function (s, i) {
+      s.parts.forEach(function (p) { p.actor = i; (p.role === 'shadow' ? shadows : rest).push(p); });
+      all.push.apply(all, s.sil);
+    });
+    var first = scenes[0]!;
+    return Object.assign({}, first, {
+      parts: shadows.concat(rest), actors: scenes, sil: K.hull(all), body: K.bbox(all),
+      facets: scenes.flatMap(function (s) { return s.facets; }), mesh: scenes.flatMap(function (s) { return s.mesh; }),
+      guides: scenes.some(function (s) { return s.guides; })
+    });
   }
 
   // ── a character on a canvas ─────────────────────────────────────────────
@@ -524,5 +549,5 @@ export interface SceneView { w: number; h: number; cam: Camera; guides?: boolean
   /** Put a character on a canvas. */
   function create(canvas: CanvasLike, o: CharacterOptions): Character { return new Character(canvas, o); }
 
-export { create, render, scene, camera, rrect };
-export const Ch = { create, render, scene, camera, rrect };
+export { create, render, paint, mergeScenes, scene, camera, rrect };
+export const Ch = { create, render, paint, mergeScenes, scene, camera, rrect };
