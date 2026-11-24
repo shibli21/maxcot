@@ -1,7 +1,9 @@
-// score.js: the showcase, written as a score.
+// score.ts: the showcase, written as a score.
 // Every line is { at: [bar, beat], <command>: value }; half beats are fine.
 // `max` and `glitch` are bare names on purpose: the conductor passes them in.
-export default function score(max, glitch) {
+import type { ScoreEvent } from 'maxcot/score';
+
+export default function score(max: string, glitch: string): ScoreEvent[] {
   return [
     { at: [2, 1], create: max },
     { at: [2, 2], style: 'pencil' },

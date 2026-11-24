@@ -2,10 +2,16 @@
   "name": "maxcot-workspace",
   "private": true,
   "type": "module",
-  "workspaces": ["packages/*", "apps/*"],
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
   "scripts": {
     "dev": "bun --filter @maxcot/studio dev",
     "build": "bun --filter @maxcot/studio build",
-    "record": "bun apps/studio/scripts/record.mjs"
+    "record": "bun apps/studio/scripts/record.mjs",
+    "typecheck": "bun --filter \"*\" typecheck",
+    "test": "bun --filter maxcot test && bun --filter @maxcot/studio test",
+    "build:lib": "bun --filter maxcot build"
   }
 }

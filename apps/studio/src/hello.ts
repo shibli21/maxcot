@@ -1,6 +1,8 @@
-// hello.js: a 13-second film. Shots hold beats (poses, looks);
+// hello.ts: a 13-second film. Shots hold beats (poses, looks);
 // the editable tracks say who plays the part and which skin it is drawn in.
-export default {
+import type { Film } from 'maxcot/film';
+
+const hello: Film = {
   title: 'Hello',
   actor: { key: 'max', label: 'Max' },
   shots: [
@@ -35,3 +37,4 @@ export default {
   end: { card: 'logo', len: 2 }
 };
 
+export default hello;

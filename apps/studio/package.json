@@ -8,7 +8,8 @@
     "preview": "vite preview",
     "record": "bun scripts/record.mjs",
     "test": "playwright test",
-    "test:update": "playwright test --update-snapshots"
+    "test:update": "playwright test --update-snapshots",
+    "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
     "maxcot": "workspace:*"
@@ -16,6 +17,7 @@
   "devDependencies": {
     "@playwright/test": "^1.65.1",
     "puppeteer-core": "^25.18.1",
+    "typescript": "^7.0.2",
     "vite": "^8.3.8"
   }
 }
