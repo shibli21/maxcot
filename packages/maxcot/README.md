@@ -70,6 +70,18 @@ score.play();
 
 Pass `clock` (anything with `start`, `stop`, `now` and `running`) to follow an audio clock.
 
+Scores can also be text. `parseScore` reads a JSON-like syntax with comments, unquoted
+keys, single quotes and trailing commas. It never evaluates anything, and errors point at a
+line and column:
+
+```ts
+import { parseScore } from 'maxcot/score';
+
+const r = parseScore(text);
+if (r.ok) score.load(r.score.events, { bpm: r.score.bpm });   // keeps the playhead
+else console.log(`line ${r.error.line}: ${r.error.message}`);
+```
+
 ## Films
 
 ```ts

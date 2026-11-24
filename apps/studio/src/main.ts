@@ -2,11 +2,10 @@
 // the side panel (Styles, Tune, Poses, Design, Motion), the two code panes and
 // the transport. Every score command lands in CMD below; the UI calls the same
 // functions, so anything the score can do, a person can do by hand.
-import { kit as K, Actor, Character, CAST, DESIGN, POSE_SECTIONS, render, type DesignRow, type DesignValues, type Skin } from 'maxcot';
+import { kit as K, Actor, Character, CAST, DESIGN, POSES, POSE_SECTIONS, render, type DesignRow, type DesignValues, type Skin } from 'maxcot';
 import { GROUPS, allSkins, skinsByName } from 'maxcot/skins';
 import { Editor, Player, card, type StyleSegment, type TrackName, type WhoSegment } from 'maxcot/film';
-import { createConductor, type CommandContext, type Conductor, type ScheduledEvent, type ScoreEvent } from 'maxcot/score';
-import score from './score';
+import { createConductor, parseScore, type CommandContext, type Conductor, type ScheduledEvent, type ScoreEvent } from 'maxcot/score';
 import hello from './hello';
 import Beat from './beat';
 import './studio.css';
@@ -19,8 +18,10 @@ import printSrc from '../../../packages/maxcot/src/skins/print.ts?raw';
 import screensSrc from '../../../packages/maxcot/src/skins/screens.ts?raw';
 import glitchSrc from '../../../packages/maxcot/src/skins/glitch.ts?raw';
 import filmSrc from '../../../packages/maxcot/src/film/film.ts?raw';
-import scoreSrc from './score.ts?raw';
+import tourScoreRaw from './scores/tour.score?raw';
 import mainSrc from './main.ts?raw';
+// textareas normalise line endings, so compare against the same form
+const tourScore = tourScoreRaw.replace(/\r\n?/g, '\n');
 
 type Mode = 'single' | 'sizes' | 'sheet' | 'deal' | 'faces' | 'aspects' | 'film' | 'card';
 type Panel = 'Styles' | 'Tune' | 'Poses' | 'Design' | 'Motion';
@@ -371,12 +372,96 @@ function renderCode(host: HTMLElement, lines: string[], hi: number): void {
   scrollCode(host, hi);
 }
 function scrollCode(host: HTMLElement, i: number): void { const ln = host.children[i] as HTMLElement | undefined; if (ln) host.scrollTop = Math.max(0, ln.offsetTop - host.clientHeight * 0.32); }
-const scoreLines = scoreSrc.split('\n'), scoreLineOf: number[] = [];
-scoreLines.forEach((l, i) => { if (/^\s*\{\s*at:/.test(l)) scoreLineOf.push(i); });
+// ── the score editor: plain data, parsed (never run) and applied as you type ──
+interface Mark { line: number; level: 'error' | 'warn'; message: string }
+let scoreText = tourScore, scoreLineOf: number[] = [], marks: Mark[] = [], hiLine = -1, applyTimer = 0, pending = false;
+const edTa = () => $<HTMLTextAreaElement>('#scoreEdit'), edHl = () => $('#scoreHl');
+/** `palette`, `to` and `from` qualify a command; `grid` does too when it rides along with `sheet`. */
+function commandsOf(e: ScoreEvent): string[] { return e.sheet ? ['sheet'] : Object.keys(e).filter((k) => ['at', 'palette', 'to', 'from', 'on'].indexOf(k) < 0); }
+
+function renderScore(): void {
+  const lines = scoreText.split('\n'), byLine = new Map(marks.map((m) => [m.line, m] as const));
+  edHl().innerHTML = lines.map((l, i) => {
+    const m = byLine.get(i);
+    return '<div class="ln' + (i === hiLine ? ' hi' : '') + (m ? ' ' + m.level : '') + '">' + (hl(l) || ' ') + '</div>';
+  }).join('');
+  const first = marks.find((m) => m.level === 'error') || marks[0], status = $('#scoreStatus');
+  status.textContent = first
+    ? (first.level === 'error' ? 'Line ' : 'Warning, line ') + (first.line + 1) + ': ' + first.message + (marks.length > 1 ? '  (+' + (marks.length - 1) + ' more)' : '')
+    : pending ? 'typing…' : scoreText === tourScore ? '' : 'edited, playing your version';
+  status.className = first ? first.level : pending || scoreText === tourScore ? '' : 'ok';
+  status.title = marks.map((m) => 'line ' + (m.line + 1) + ': ' + m.message).join('\n');
+  syncScroll();
+}
+function syncScroll(): void { edHl().scrollTop = edTa().scrollTop; edHl().scrollLeft = edTa().scrollLeft; }
 function hiScore(i: number): void {
-  const host = $('#scoreSrc'), li = scoreLineOf[i]; if (li == null) return;
-  const old = host.querySelector('.hi'); if (old) old.classList.remove('hi');
-  const ln = host.children[li]; if (ln) { ln.classList.add('hi'); scrollCode(host, li); }
+  const li = scoreLineOf[i]; if (li == null) return;
+  const host = edHl(), old = host.querySelector('.hi'); if (old) old.classList.remove('hi');
+  hiLine = li; const ln = host.children[li] as HTMLElement | undefined; if (!ln) return;
+  ln.classList.add('hi');
+  // follow the playhead, but never yank the text away from someone typing
+  if (document.activeElement !== edTa()) { edTa().scrollTop = Math.max(0, ln.offsetTop - edTa().clientHeight * 0.32); syncScroll(); }
+}
+
+/** Closest known name, for "did you mean" hints. */
+function nearest(word: string, names: Iterable<string>): string | null {
+  let best: string | null = null, bestD = Infinity;
+  for (const n of names) {
+    const a = word.toLowerCase(), b = n.toLowerCase(), d: number[] = Array.from({ length: b.length + 1 }, (_, j) => j);
+    for (let i = 1; i <= a.length; i++) {
+      let prev = d[0]!; d[0] = i;
+      for (let j = 1; j <= b.length; j++) { const tmp = d[j]!; d[j] = Math.min(d[j]! + 1, d[j - 1]! + 1, prev + (a[i - 1] === b[j - 1] ? 0 : 1)); prev = tmp; }
+    }
+    const dist = d[b.length]!; if (dist < bestD) { bestD = dist; best = n; }
+  }
+  return best && bestD <= Math.max(2, word.length / 3) ? best : null;
+}
+const KNOWN: Record<string, Set<string>> = {
+  pose: new Set(Object.keys(POSES)), style: new Set(Object.keys(SKINS)),
+  who: new Set(Object.keys(CAST)), preset: new Set(Object.keys(CAST)), create: new Set(Object.keys(CAST)),
+  set: new Set(DESIGN.map((r) => r[0])), open: new Set(['Styles', 'Tune', 'Poses', 'Design', 'Motion']),
+  edit: new Set(['Who plays it', 'Style'])
+};
+const PALETTES = new Set((skin('hologram').palettes || []).map((p) => p.name));
+/** Things that parse but won't do what the author meant: shown as warnings, the score still plays. */
+function validate(events: ScoreEvent[], lines: number[]): Mark[] {
+  const out: Mark[] = [];
+  events.forEach((e, i) => {
+    const line = lines[i]!;
+    commandsOf(e).forEach((c) => {
+      if (!CMD[c]) { const n = nearest(c, Object.keys(CMD)); out.push({ line, level: 'warn', message: 'unknown command `' + c + '`' + (n ? ', did you mean `' + n + '`?' : '') }); return; }
+      const known = KNOWN[c], v = String(e[c]);
+      if (known && !known.has(v)) { const n = nearest(v, known); out.push({ line, level: 'warn', message: 'no ' + c + " called '" + v + "'" + (n ? ", did you mean '" + n + "'?" : '') }); }
+    });
+    if (e.palette != null && !PALETTES.has(String(e.palette))) out.push({ line, level: 'warn', message: "no palette called '" + e.palette + "'" });
+    if (e.set != null && typeof e.to !== 'number') out.push({ line, level: 'warn', message: '`set` needs `to: <number>`' });
+  });
+  return out;
+}
+function applyScore(): void {
+  pending = false;
+  const r = parseScore(scoreText);
+  if (!r.ok) { marks = [{ line: r.error.line - 1, level: 'error', message: r.error.message + ' (column ' + r.error.col + ')' }]; renderScore(); return; }
+  marks = validate(r.score.events, r.lines);
+  scoreLineOf = r.lines;
+  const bpm = r.score.bpm || 92; beat.bpm = bpm;
+  bts.load(r.score.events, { bpm, tail: r.score.tail ?? 3.2 });
+  $<HTMLInputElement>('#scrub').max = String(bts.total);
+  renderScore();
+}
+function initEditor(): void {
+  const ta = edTa(); ta.value = scoreText;
+  ta.addEventListener('input', () => {
+    scoreText = ta.value; pending = true; renderScore();
+    clearTimeout(applyTimer); applyTimer = window.setTimeout(applyScore, 250);
+  });
+  ta.addEventListener('scroll', syncScroll);
+  ta.addEventListener('keydown', (e) => {
+    if (e.key === 'Tab') { e.preventDefault(); ta.setRangeText('  ', ta.selectionStart, ta.selectionEnd, 'end'); ta.dispatchEvent(new Event('input')); }
+    else if (e.key === 'Escape') ta.blur();
+  });
+  $('#bRevert').onclick = () => { ta.value = tourScore; ta.dispatchEvent(new Event('input')); clearTimeout(applyTimer); applyScore(); };
+  renderScore();
 }
 function lit(o: unknown): string[] { return JSON.stringify(o, null, 2).replace(/"([A-Za-z_$][\w$]*)":/g, '$1:').replace(/"((?:[^"\\]|\\.)*)"/g, "'$1'").split('\n'); }
 const LIB = 'packages/maxcot/src/';
@@ -446,7 +531,7 @@ function wire(): void {
   $('#bFree').onclick = () => bts.seek(bts.timeOf([4, 4.5]) + 0.01);
   window.addEventListener('keydown', (e) => {
     const t = e.target as HTMLInputElement;
-    if (t.tagName === 'INPUT' && t.type !== 'range') return;
+    if (t.tagName === 'TEXTAREA' || (t.tagName === 'INPUT' && t.type !== 'range')) return;
     if (e.code === 'Space') { e.preventDefault(); $('#bPlay').click(); }
     else if (e.code === 'ArrowRight') { e.preventDefault(); $('#bNext').click(); }
     else if (e.code === 'ArrowLeft') { e.preventDefault(); $('#bPrev').click(); }
@@ -486,24 +571,27 @@ function step(dt: number): void {
 }
 
 // ── boot ─────────────────────────────────────────────────────────────────
-const BPM = 92, beat = new Beat(BPM);
+const tour = parseScore(tourScore);
+if (!tour.ok) throw new Error('tour.score line ' + tour.error.line + ': ' + tour.error.message);
+const BPM = tour.score.bpm || 92, beat = new Beat(BPM);
+scoreLineOf = tour.lines;
 const beatClock = { start: (t: number) => { beat.start(t); }, stop: () => beat.stop(), now: () => beat.now(), get running() { return beat.running; } };
 function setSound(on: boolean): void { beat.on = on; bts.setClock(on ? beatClock : null); }
 bts = createConductor({
-  bpm: BPM, events: score('max', 'glitch'), tail: 3.2, onCommand: exec, onReset: reset, onSettle: settle,
-  // `palette`, `to` and `from` qualify a command; `grid` does too when it rides along with `sheet`
-  commandsOf: (e: ScoreEvent) => (e.sheet ? ['sheet'] : Object.keys(e).filter((k) => ['at', 'palette', 'to', 'from'].indexOf(k) < 0))
+  bpm: BPM, events: tour.score.events, tail: tour.score.tail ?? 3.2, onCommand: exec, onReset: reset, onSettle: settle, commandsOf
 });
 setSound(!CAPTURE);
 if (CAPTURE) document.documentElement.classList.add('capture');
-renderCode($('#scoreSrc'), scoreLines, -1);
+marks = validate(tour.score.events, tour.lines);
+initEditor();
 reset(); wire(); showSource('create'); transport();
 if (!CAPTURE) requestAnimationFrame(loop);
 
 declare global { interface Window { Studio: unknown } }
 window.Studio = {
   exec, step, openPanel, setMode, conductor: bts,
-  renderBeatWav: (sec: number) => Beat.render(BPM, sec).then(Beat.wav64),
+  renderBeatWav: (sec: number) => Beat.render(bts.bpm, sec).then(Beat.wav64),
+  setScore: (text: string) => { const ta = edTa(); ta.value = text; ta.dispatchEvent(new Event('input')); clearTimeout(applyTimer); applyScore(); },
   get state() { return ST; }, get film() { return film; }
 };
 export type { StyleSegment, WhoSegment };

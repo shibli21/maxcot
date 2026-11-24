@@ -20,6 +20,21 @@ button { font: inherit; }
 .ln { padding: 0 14px 0 22px; position: relative; min-height: 1.62em; }
 .ln.hi { background: var(--hi); }
 .ln.hi::before { content: ''; position: absolute; left: 6px; top: 2px; bottom: 2px; width: 4px; background: var(--hi-bar); border-radius: 1px; }
+/* the score editor: a transparent textarea over a highlighted copy of the same text */
+.pane header { display: flex; align-items: center; gap: 10px; }
+#scoreStatus { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#scoreStatus.error { color: #ff7b72; } #scoreStatus.warn { color: #e3b341; } #scoreStatus.ok { color: #7ee787; }
+#bRevert { background: none; border: 1px solid #3a3f46; color: #9aa0a8; font: inherit; font-size: 11px; padding: 1px 8px; cursor: pointer; }
+#bRevert:hover { color: #fff; border-color: #6b717a; }
+.editor { position: relative; flex: 1; min-height: 0; }
+.editor .hl { position: absolute; inset: 0; overflow: hidden; scroll-behavior: auto; }
+.editor textarea { position: absolute; inset: 0; z-index: 1; margin: 0; border: 0; outline: 0; resize: none; padding: 10px 14px 40vh 22px;
+  font: inherit; line-height: 1.62; white-space: pre; overflow: auto; background: transparent; color: transparent; caret-color: var(--hi-bar); tab-size: 2; }
+.editor textarea::selection { background: rgba(240, 166, 58, 0.3); }
+.editor textarea::-webkit-scrollbar { width: 0; height: 0; }
+.editor textarea:focus + .hl, .editor:focus-within { box-shadow: inset 2px 0 0 #3a3f46; }
+.ln.error { background: rgba(255, 90, 80, 0.18); box-shadow: inset 0 -2px 0 #ff7b72; }
+.ln.warn { box-shadow: inset 0 -2px 0 #e3b341; }
 .t-c { color: var(--code-dim); } .t-s { color: var(--str); } .t-n { color: var(--num); } .t-k { color: var(--kw); }
 
 /* ── stage ────────────────────────────────────────── */

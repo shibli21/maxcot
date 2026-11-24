@@ -48,23 +48,31 @@ Node and writing your own skin.
 
 ## The score
 
-The whole showcase is one data file, [`apps/studio/src/score.ts`](apps/studio/src/score.ts):
+The whole showcase is one data file, [`apps/studio/src/scores/tour.score`](apps/studio/src/scores/tour.score):
 
-```ts
-{ at: [2, 1], create: max },
-{ at: [3, 1], pose: 'thinking' },
-{ at: [5, 2], style: 'felttip' },
-{ at: [8, 1], style: 'hologram', palette: 'cyan' },
-{ at: [9, 2], who: 'girl' },
-{ at: [17, 1], set: 'body.w', to: 1.05 },
-{ at: [20, 1], play: 'filmkit/films/hello.js' },
-{ at: [24, 2.5], end: { card: 'logo', text: 'MAXCOT' } }
+```js
+{
+  title: 'Tour', bpm: 92,
+  events: [
+    { at: [2, 1], create: 'max' },
+    { at: [3, 1], pose: 'thinking' },
+    { at: [5, 2], style: 'felttip' },
+    { at: [8, 1], style: 'hologram', palette: 'cyan' },
+    { at: [17, 1], set: 'body.w', to: 1.05 },
+    { at: [24, 2.5], end: { card: 'logo', text: 'MAXCOT' } },
+  ]
+}
 ```
 
-The library's generic conductor (`maxcot/score`) schedules it. Each verb (`create`,
-`style`, `pose`, `who`, `set`, `play`, `camera`, `end` and the rest) is one function in the
-studio's `CMD` table, and the UI calls the same functions, so anything the score can do,
-you can do by hand.
+**Edit it live.** The score pane in the studio is an editor: change a line and it plays
+back immediately from where the playhead is. A syntax error is marked on its line, and the
+last good version keeps playing. A typo such as `pose: 'thinkin'` gets a warning with a
+suggestion. **Revert** goes back to the tour. Scores are plain data, parsed and never run,
+so a score from someone else is safe to open.
+
+Each verb (`create`, `style`, `pose`, `who`, `set`, `play`, `camera`, `end` and the rest) is
+one function in the studio's `CMD` table, and the UI calls the same functions, so anything
+the score can do, you can do by hand.
 
 ## How it works
 
@@ -95,7 +103,7 @@ packages/maxcot/src/
   score/conductor.ts bars-and-beats sequencer with seek-by-replay
 apps/studio/src/
   main.ts            views, panels, code panes, transport, the CMD table
-  score.ts           the showcase
+  scores/tour.score  the showcase, as data
   hello.ts           the 13-second film
   beat.ts            the WebAudio drum machine
 ```

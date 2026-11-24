@@ -61,6 +61,8 @@ export class Conductor {
   last = -1;
   clock: Clock | null;
   private next = 0;
+  private tail: number;
+  private commandsOf: (e: ScoreEvent) => string[];
   private onCommand: NonNullable<ConductorOptions['onCommand']>;
   private onReset: (t: number) => void;
   private onSettle: (t: number) => void;
@@ -70,12 +72,28 @@ export class Conductor {
     this.onCommand = o.onCommand || (() => {}); this.onReset = o.onReset || (() => {}); this.onSettle = o.onSettle || (() => {});
     this.clock = o.clock || null;
     const mods = new Set(o.modifiers || ['at']);
-    const commandsOf = o.commandsOf || ((e: ScoreEvent) => Object.keys(e).filter((k) => !mods.has(k) && k !== 'i' && k !== 't'));
-    this.events = (o.events || [])
-      .map((e, i): ScheduledEvent => ({ ...e, i, t: this.timeOf(e.at), cmds: commandsOf(e) }))
+    this.commandsOf = o.commandsOf || ((e: ScoreEvent) => Object.keys(e).filter((k) => !mods.has(k) && k !== 'i' && k !== 't'));
+    this.tail = o.tail || 0;
+    this.events = []; this.total = 0;
+    this.schedule(o.events || []);
+  }
+  private schedule(events: ScoreEvent[]): void {
+    this.events = events
+      .map((e, i): ScheduledEvent => ({ ...e, i, t: this.timeOf(e.at), cmds: this.commandsOf(e) }))
       .sort((a, b) => a.t - b.t || a.i - b.i);
     const lastEvent = this.events[this.events.length - 1];
-    this.total = (lastEvent ? lastEvent.t : 0) + (o.tail || 0);
+    this.total = (lastEvent ? lastEvent.t : 0) + this.tail;
+  }
+  /**
+   * Swap in new events (an edited score), optionally with a new tempo, keeping the
+   * playhead where it is. The host's state is rebuilt by replaying up to it.
+   */
+  load(events: ScoreEvent[], o: { bpm?: number; beatsPerBar?: number; tail?: number } = {}): void {
+    if (o.bpm) this.bpm = o.bpm;
+    if (o.beatsPerBar) this.beatsPerBar = o.beatsPerBar;
+    if (o.tail != null) this.tail = o.tail;
+    this.schedule(events);
+    this.seek(Math.min(this.songT, this.total));
   }
   /** Seconds per beat. */
   spb(): number { return 60 / this.bpm; }

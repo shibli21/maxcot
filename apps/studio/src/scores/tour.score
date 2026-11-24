@@ -1,11 +1,12 @@
-// score.ts: the showcase, written as a score.
-// Every line is { at: [bar, beat], <command>: value }; half beats are fine.
-// `max` and `glitch` are bare names on purpose: the conductor passes them in.
-import type { ScoreEvent } from 'maxcot/score';
-
-export default function score(max: string, glitch: string): ScoreEvent[] {
-  return [
-    { at: [2, 1], create: max },
+// tour.score: the showcase, written as a score.
+// Plain data: edit it in the studio and it plays back as you type.
+// Every event is { at: [bar, beat], <command>: value }; half beats are fine.
+{
+  title: 'Tour',
+  bpm: 92,
+  tail: 3.2,
+  events: [
+    { at: [2, 1], create: 'max' },
     { at: [2, 2], style: 'pencil' },
     { at: [2, 3], look: 'code' },
     { at: [2, 4], open: 'Poses' },
@@ -35,7 +36,7 @@ export default function score(max: string, glitch: string): ScoreEvent[] {
     { at: [6, 3.5], style: 'stylemosh' },
     { at: [6, 4], style: 'cubist' },
     { at: [6, 4.5], style: 'trails' },
-    { at: [7, 1], style: glitch },
+    { at: [7, 1], style: 'glitch' },
     { at: [7, 2], style: 'datamosh' },
     { at: [7, 2.5], style: 'feedback' },
     { at: [7, 3], style: 'teletext' },
@@ -59,7 +60,7 @@ export default function score(max: string, glitch: string): ScoreEvent[] {
     { at: [9, 3], who: 'clerk' },
     { at: [9, 3.5], who: 'teen' },
     { at: [9, 4], who: 'professor' },
-    { at: [9, 4.5], who: max },
+    { at: [9, 4.5], who: 'max' },
     // bar 10
     { at: [10, 1], size: 48 },
     { at: [10, 2], size: 96 },
@@ -115,7 +116,7 @@ export default function score(max: string, glitch: string): ScoreEvent[] {
     { at: [19, 1], preset: 'child' },
     { at: [19, 2], preset: 'boss' },
     { at: [19, 3], preset: 'oldman' },
-    { at: [19, 4], preset: max },
+    { at: [19, 4], preset: 'max' },
     // bar 20
     { at: [20, 1], play: 'filmkit/films/hello.js' },
     { at: [20, 2], play: 'filmkit/films/hello.js', from: 3.6 },
@@ -144,11 +145,10 @@ export default function score(max: string, glitch: string): ScoreEvent[] {
     { at: [23, 2.5], style: 'felttip' },
     { at: [23, 3], who: 'oldman' },
     { at: [23, 3.5], style: 'inkpunch' },
-    { at: [23, 4], who: max },
+    { at: [23, 4], who: 'max' },
     { at: [23, 4.5], style: 'pencil' },
     // bar 24
     { at: [24, 1], take: 'the pointer' },
     { at: [24, 2.5], end: { card: 'logo', text: 'MAXCOT' } }
-  ];
+  ]
 }
-
