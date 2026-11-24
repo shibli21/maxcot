@@ -4,10 +4,8 @@
 // and the face is mapped onto the front plane. The door split doubles as the
 // mouth line. Skins never see 3D, only the flat Scene:
 //   S.parts[] = { role, pts, fill, shade, edge, line, lw, group, clip, seam }
-(function (root) {
-  'use strict';
-  var K = root.MaxcotKit, Rig = root.MaxcotRig;
-  var Skins = root.CharacterSkins = root.CharacterSkins || {};
+import K from './kit.js';
+import { Actor } from './rig.js';
   var cos = Math.cos, sin = Math.sin, PI = Math.PI, min = Math.min, max = Math.max, abs = Math.abs;
   var LIGHT = norm([-0.45, 0.68, 0.58]);
 
@@ -392,7 +390,8 @@
   // ── render one frame of one actor into a 2D context ─────────────────────
   function render(ctx, w, h, F, o) {
     o = o || {};
-    var skin = Skins[o.style] || Skins.pencil, t = o.t == null ? F.t : o.t;
+    var skin = o.skin, t = o.t == null ? F.t : o.t;
+    if (!skin || !skin.draw) throw new Error('maxcot render: pass a skin, e.g. import { pencil } from "maxcot/skins"');
     var cam = o.cam || camera(F.P, w, h, o.frame || 'full', o.zoom);
     var fps = skin.fps || 12, seed = Math.floor(t * fps) + (o.seedOff || 0);
     var S = scene(F, { w: w, h: h, cam: cam, guides: o.guides, seed: seed });
@@ -412,19 +411,19 @@
   function create(canvas, o) {
     o = o || {};
     var h = {
-      canvas: canvas, ctx: canvas.getContext('2d'), actor: o.actor || new Rig.Actor({ who: o.who }),
-      style: o.style || 'pencil', palette: o.palette, frame: o.frame || 'full', guides: !!o.guides, zoom: 1, cam: null,
+      canvas: canvas, ctx: canvas.getContext('2d'), actor: o.actor || new Actor({ who: o.who }),
+      skin: o.skin, palette: o.palette, frame: o.frame || 'full', guides: !!o.guides, zoom: 1, cam: null,
       key: o.key || ('c' + Math.random().toString(36).slice(2, 8)), last: -1, dirty: true, isStatic: !!o.isStatic, F: null,
       set: function (v) { for (var k in v) this.actor.set(k, v[k]); this.dirty = true; return this; },
       pose: function (n) { this.actor.pose(n); this.dirty = true; return this; },
       draw: function (t, force) {
-        var skin = Skins[this.style] || Skins.pencil, step = Math.floor(t * (skin.fps || 12));
+        var skin = this.skin, step = Math.floor(t * ((skin && skin.fps) || 12));
         if (this.isStatic && !this.dirty && !force) return false;
         if (!force && step === this.last && !this.dirty) return false;
         this.last = step; this.dirty = false;
         var F = this.F || this.actor.frame(this.isStatic ? 0.6 : null);
         this.S = render(this.ctx, this.canvas.width, this.canvas.height, F, {
-          style: this.style, palette: this.palette, frame: this.frame, guides: this.guides, t: t, key: this.key, zoom: this.zoom, cam: this.cam
+          skin: this.skin, palette: this.palette, frame: this.frame, guides: this.guides, t: t, key: this.key, zoom: this.zoom, cam: this.cam
         });
         return true;
       }
@@ -432,6 +431,5 @@
     return h;
   }
 
-  // ── the engine's own skins, in the registry ─────────────────────────────
-  root.Ch = { create: create, render: render, scene: scene, camera: camera, rrect: rrect };
-})(window);
+export { create, render, scene, camera, rrect };
+export const Ch = { create, render, scene, camera, rrect };

@@ -1,7 +1,6 @@
 // engine/skins/print.js: PRINT AND PASTE. Ink on paper by a machine, a screen or a can.
-(function (root) {
-  'use strict';
-  var K = root.MaxcotKit, Skins = root.CharacterSkins = root.CharacterSkins || {};
+import K from '../kit.js';
+const Skins = {};
   var tv = function (k, d) { return K.tv ? K.tv(k, d) : d; };
 
   // A flat-colour pass most print skins start from (drawn into a buffer).
@@ -198,4 +197,5 @@
       ctx.globalAlpha = 0.55; ctx.drawImage(A, 0, 0); ctx.globalAlpha = 1;
     }
   };
-})(window);
+export const { print, riso, gigposter, stencil, manga, cubist } = Skins;
+

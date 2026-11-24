@@ -1,10 +1,31 @@
-// studio.js: the studio. Views (single, sizes, sheets, aspects, film, card),
+// main.js: the studio. Views (single, sizes, sheets, aspects, film, card),
 // the side panel (Styles, Tune, Poses, Design, Motion), the two code panes and
 // the transport. Every score command lands in CMD below; the UI calls the same
 // functions, so anything the score can do, a person can do by hand.
-(function (root) {
-  'use strict';
-  var K = root.MaxcotKit, Rig = root.MaxcotRig, Design = root.MaxcotDesign, Skins = root.CharacterSkins, Ch = root.Ch, FK = root.FilmKit, FX = root.MaxcotFX;
+import { kit as K, Actor, POSES, POSE_SECTIONS, resolvePose, DESIGN, CAST, createCharacter, render, scene } from 'maxcot';
+import { skinsByName } from 'maxcot/skins';
+import { Player, Editor, card } from 'maxcot/film';
+import { createConductor } from 'maxcot/score';
+import score from './score.js';
+import hello from './hello.js';
+import Beat from './beat.js';
+import './studio.css';
+
+  var root = window;
+  // Thin adapters: the studio names skins with strings (that is what the score uses).
+  var Skins = skinsByName();
+  var Rig = { Actor: Actor, SECTIONS: POSE_SECTIONS, P: POSES, resolve: resolvePose };
+  var Design = { DESIGN: DESIGN, CAST: CAST };
+  var FK = { Player: Player, Editor: Editor, card: card };
+  var Ch = {
+    scene: scene,
+    render: function (ctx, w, h, F, o) { return render(ctx, w, h, F, Object.assign({}, o, { skin: Skins[o.style] || Skins.pencil })); },
+    create: function (canvas, o) {
+      var h = createCharacter(canvas, Object.assign({}, o, { skin: Skins[o.style || 'pencil'] }));
+      Object.defineProperty(h, 'style', { get: function () { return this.skin && this.skin.name; }, set: function (v) { if (!this.skin || this.skin.name !== v) { this.skin = Skins[v]; this.dirty = true; } } });
+      return h;
+    }
+  };
   var DPR = Math.min(root.devicePixelRatio || 1, 1.5);
   var CAPTURE = /[?&]capture(=|&|$)/.test(location.search), SMOOTH = CAPTURE ? 'auto' : 'smooth';
   var $ = function (s) { return document.querySelector(s); };
@@ -12,6 +33,7 @@
 
   var GROUPS = [['drawn', 'Drawn'], ['print', 'Print and paste'], ['screens', 'Screens and light'], ['signal', 'Glitch: signal'], ['time', 'Glitch: time']];
   var FILE_OF = { drawn: 'drawn', print: 'print', screens: 'screens', signal: 'glitch', time: 'glitch' };
+  var LIB = 'packages/maxcot/src/';
   var STYLE_ORDER = []; GROUPS.forEach(function (g) { Object.keys(Skins).forEach(function (k) { if (Skins[k].group === g[0]) STYLE_ORDER.push(k); }); });
   var CAST_ORDER = ['max', 'child', 'girl', 'boss', 'clerk', 'teen', 'professor', 'oldman'];
   var SECTION_LABEL = { attitudes: 'Attitudes', feelings: 'Feelings', eyes: 'Eyes', mouth: 'Mouth and tongues', hands: 'Hands', body: 'Body' };
@@ -28,7 +50,7 @@
       sizesUpTo: 48, grid: 3, sheetKind: 'styles', dealSeed: 0, faces: 1, panel: null, editRow: null, multicam: false,
       card: null, pointer: null, clock: ST.clock || 0, rev: 0, revAt: 0, panelRev: -1, created: false, src: null
     };
-    mainH.actor = ST.actor; K.tune = {}; FX.wind = 0.3;
+    mainH.actor = ST.actor; K.tune = {};
     film = null; editor = null; $('#timeline').innerHTML = ''; $('#pointer').style.display = 'none';
     $('#panel').classList.remove('on'); setMode('single');
   }
@@ -174,7 +196,7 @@
   // ── film ─────────────────────────────────────────────────────────────────
   function ensureFilm() {
     if (film) return;
-    film = new FK.Player(JSON.parse(JSON.stringify(root.Films.hello)));
+    film = new FK.Player(JSON.parse(JSON.stringify(hello)), { skins: Skins });
     editor = new FK.Editor($('#timeline'), film, { onPick: buildPicker, onAspect: layoutFilm, onChange: function () { src('film'); } });
   }
   var ASPECT = { wide: 16 / 9, tall: 9 / 16, square: 1, portrait: 0.8 };
@@ -326,30 +348,30 @@
   }
   function lit(o) { return JSON.stringify(o, null, 2).replace(/"([A-Za-z_$][\w$]*)":/g, '$1:').replace(/"((?:[^"\\]|\\.)*)"/g, "'$1'").split('\n'); }
   function showSource(kind, name) {
-    var file = 'engine/character.js', lines = [], hi = 0;
+    var file = LIB + 'character.js', lines = [], hi = 0;
     if (kind === 'style') {
-      var s = Skins[name]; file = 'engine/skins/' + FILE_OF[s.group] + '.js';
+      var s = Skins[name]; file = LIB + 'skins/' + FILE_OF[s.group] + '.js';
       lines = ['Skins.' + name + ' = {', "  name: '" + s.name + "', label: '" + s.label + "', group: '" + s.group + "',", "  about: '" + s.about.replace(/'/g, "\\'") + "',", '  fps: ' + s.fps + ', hold: ' + JSON.stringify(s.hold).replace(/"/g, "'") + ',', '  draw: ' + fnLines(s.draw).join('\n  ').trim(), '};'];
       lines = lines.join('\n').split('\n'); hi = 1;
     } else if (kind === 'pose') {
-      file = 'engine/rig.js'; var def = Rig.P[name] || {};
+      file = LIB + 'rig.js'; var def = Rig.P[name] || {};
       lines = ["P['" + name + "'] = " + lit(def).join('\n') + ';', '', '// resolves to these channel targets on layer ' + (def.layer || 'all') + ':'].concat(lit(Rig.resolve(name).values));
       lines = lines.join('\n').split('\n');
     } else if (kind === 'who') {
-      file = 'engine/design.js'; var c = Design.CAST[name] || Design.CAST.max;
+      file = LIB + 'design.js'; var c = Design.CAST[name] || Design.CAST.max;
       lines = ["cast('" + c.key + "', '" + c.label + "', '" + c.about.replace(/'/g, "\\'") + "', " + lit(c.values).join('\n') + ');'].join('\n').split('\n');
     } else if (kind === 'set') {
-      file = 'engine/design.js'; lines = ['// DESIGN: what the character is. One row per dial.', '// [key, group, label, help, min, max, default]', 'var DESIGN = ['];
+      file = LIB + 'design.js'; lines = ['// DESIGN: what the character is. One row per dial.', '// [key, group, label, help, min, max, default]', 'var DESIGN = ['];
       Design.DESIGN.forEach(function (r) { if (r[0] === name) hi = lines.length; lines.push("  ['" + r[0] + "', '" + r[1] + "', '" + r[2] + "', '" + r[3].replace(/'/g, "\\'") + "', " + r[4] + ', ' + r[5] + ', ' + r[6] + '],'); });
       lines.push('];');
     } else if (kind === 'film') {
-      file = 'filmkit/films/hello.js'; lines = ['Films.hello = ' + lit(film ? film.film : root.Films.hello).join('\n') + ';'].join('\n').split('\n');
+      file = 'apps/studio/src/hello.js'; lines = ['export default ' + lit(film ? film.film : hello).join('\n') + ';'].join('\n').split('\n');
       var want = ST.editRow ? (ST.editRow === 'who' ? 'who:' : 'style:') : (ST.multicam ? 'cameras:' : 'shots:');
       lines.forEach(function (l, i) { if (!hi && l.trim().indexOf(want) === 0) hi = i; });
-    } else if (kind === 'create') { file = 'engine/rig.js'; lines = ['function Actor(o) {'].concat(fnLines(Rig.Actor).slice(1)).concat(['', 'Actor.prototype.update = ' + fnLines(Rig.Actor.prototype.update).join('\n')]).join('\n').split('\n'); }
-    else if (kind === 'look') { file = 'engine/character.js'; lines = fnLines(Ch.scene); lines.forEach(function (l, i) { if (!hi && l.indexOf('guideParts()') >= 0) hi = i; }); }
-    else if (kind === 'take' || kind === 'end') { file = kind === 'end' ? 'filmkit/film.js' : 'engine/skins/glitch.js'; lines = fnLines(kind === 'end' ? FK.card : Skins.pixelwind.draw); }
-    else { file = 'studio.js'; lines = fnLines({ size: buildSizes, sheet: buildGrid, deal: buildGrid, faces: buildGrid, aspects: buildAspects }[kind] || buildGrid); }
+    } else if (kind === 'create') { file = LIB + 'rig.js'; lines = ['function Actor(o) {'].concat(fnLines(Rig.Actor).slice(1)).concat(['', 'Actor.prototype.update = ' + fnLines(Rig.Actor.prototype.update).join('\n')]).join('\n').split('\n'); }
+    else if (kind === 'look') { file = LIB + 'character.js'; lines = fnLines(Ch.scene); lines.forEach(function (l, i) { if (!hi && l.indexOf('guideParts()') >= 0) hi = i; }); }
+    else if (kind === 'take' || kind === 'end') { file = kind === 'end' ? LIB + 'film/film.js' : LIB + 'skins/glitch.js'; lines = fnLines(kind === 'end' ? FK.card : Skins.pixelwind.draw); }
+    else { file = 'apps/studio/src/main.js'; lines = fnLines({ size: buildSizes, sheet: buildGrid, deal: buildGrid, faces: buildGrid, aspects: buildAspects }[kind] || buildGrid); }
     $('#engineFile').textContent = file; renderCode($('#engineSrc'), lines, hi);
   }
 
@@ -360,7 +382,7 @@
     var tx = b.cx / DPR, ty = b.cy / DPR, fx = area.clientWidth + 60, fy = area.clientHeight + 60, k = K.ease(dt / 0.45);
     var x = K.lerp(fx, tx, k), y = K.lerp(fy, ty, k), s = dt > 0.45 && dt < 0.58 ? 0.8 : 1;
     ptr.style.display = 'block'; ptr.style.transform = 'translate(' + x + 'px,' + y + 'px) scale(' + s + ')';
-    if (dt > 0.5) { if (ST.style !== 'pixelwind') ST.style = 'pixelwind'; FX.wind = K.clamp((dt - 0.5) / 0.5, 0, 1); mainH.dirty = true; }
+    if (dt > 0.5) { if (ST.style !== 'pixelwind') ST.style = 'pixelwind'; K.tune['pixelwind.wind'] = K.clamp((dt - 0.5) / 0.5, 0, 1); mainH.dirty = true; }
   }
 
   // ── transport ────────────────────────────────────────────────────────────
@@ -385,7 +407,7 @@
     $('#bNext').onclick = function () { var bb = bts.barBeat(bts.songT); bts.seek(bts.timeOf([bb[0] + 1, 1]) + 0.001); };
     var sc = $('#scrub'); sc.max = bts.total;
     sc.oninput = function () { scrubbing = true; bts.seek(+sc.value); }; sc.onchange = function () { scrubbing = false; };
-    $('#cSound').onchange = function () { bts.setSound(this.checked); };
+    $('#cSound').onchange = function () { setSound(this.checked); };
     $('#cCode').onchange = function () { $('#app').classList.toggle('nocode', !this.checked); setTimeout(layout, 30); };
     $('#bPanel').onclick = function () { if (ST.panel && ST.mode === 'single') closePanel(); else { setMode('single'); openPanel(ST.panel || 'Styles'); } };
     $('#bStart').onclick = function () { bts.seek(0); bts.play(); };
@@ -433,14 +455,32 @@
     } catch (e) { console.error(e); }
   }
 
+  // The score as shown in the code pane, read back out of the score function itself.
+  function sourceOf(fn) {
+    var s = fn.toString(), a = s.indexOf('return ['), b = s.lastIndexOf('];');
+    var body = s.slice(a + 8, b).split('\n').filter(function (l, i) { return !(i === 0 && !l.trim()); });
+    var ind = body.reduce(function (m, l) { return l.trim() ? Math.min(m, l.match(/^\s*/)[0].length) : m; }, 99);
+    var lines = body.map(function (l) { return '  ' + l.slice(ind); });
+    while (lines.length && !lines[lines.length - 1].trim()) lines.pop();
+    return ['var score = ['].concat(lines).concat(['];']);
+  }
+
   // ── boot ─────────────────────────────────────────────────────────────────
-  bts = new root.BTSConductor(root.BTS_SCORE, { bpm: 92, studio: { exec: exec, reset: reset, settle: settle } });
-  bts.setSound(!CAPTURE);
+  var BPM = 92, beat = new Beat(BPM);
+  var beatClock = { start: function (t) { beat.start(t); }, stop: function () { beat.stop(); }, now: function () { return beat.now(); }, get running() { return beat.running; } };
+  function setSound(on) { beat.on = on; bts.setClock(on ? beatClock : null); }
+  bts = createConductor({
+    bpm: BPM, events: score('max', 'glitch'), tail: 3.2, onCommand: exec, onReset: reset, onSettle: settle,
+    // `palette`, `to` and `from` qualify a command; `grid` does too when it rides along with `sheet`
+    commandsOf: function (e) { return e.sheet ? ['sheet'] : Object.keys(e).filter(function (k) { return ['at', 'palette', 'to', 'from', 'i', 't'].indexOf(k) < 0; }); }
+  });
+  bts.source = sourceOf(score);
+  setSound(!CAPTURE);
   if (CAPTURE) document.documentElement.classList.add('capture');
   var srcLines = bts.source, ev = 0;
   srcLines.forEach(function (l, i) { if (/\{\s*at:/.test(l)) scoreLineOf[ev++] = i; });
   renderCode($('#scoreSrc'), srcLines, -1);
   reset(); wire(); showSource('create'); transport();
   if (!CAPTURE) requestAnimationFrame(loop);
-  root.Studio = { exec: exec, step: step, get state() { return ST; }, get film() { return film; }, conductor: bts, openPanel: openPanel, setMode: setMode };
-})(window);
+  root.Studio = { exec: exec, step: step, renderBeatWav: function (sec) { return Beat.render(BPM, sec).then(Beat.wav64); }, get state() { return ST; }, get film() { return film; }, conductor: bts, openPanel: openPanel, setMode: setMode };
+

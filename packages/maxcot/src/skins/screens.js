@@ -1,7 +1,6 @@
 // engine/skins/screens.js: SCREENS AND LIGHT. Made of light, not ink.
-(function (root) {
-  'use strict';
-  var K = root.MaxcotKit, Skins = root.CharacterSkins = root.CharacterSkins || {};
+import K from '../kit.js';
+const Skins = {};
   var tv = function (k, d) { return K.tv ? K.tv(k, d) : d; };
   function bufferOf(S, name, w, h) { return K.buffer(name + S.key, w || S.w, h || S.h); }
   function strokeAll(ctx, S, filter) {
@@ -173,4 +172,5 @@
       ctx.imageSmoothingEnabled = false; ctx.drawImage(buf, 0, 0, sw, shh, 0, 0, S.w, S.h); ctx.imageSmoothingEnabled = true;
     }
   };
-})(window);
+export const { hologram, wireframe, neon, oscilloscope, teletext, pixel } = Skins;
+

@@ -1,7 +1,8 @@
 // filmkit/film.js: Player (a film's clock and actor) and Editor (the timeline).
-(function (root) {
-  'use strict';
-  var K = root.MaxcotKit, Rig = root.MaxcotRig, Design = root.MaxcotDesign, Skins = root.CharacterSkins;
+import K from '../kit.js';
+import { Actor } from '../rig.js';
+import { CAST } from '../design.js';
+import { render, camera } from '../character.js';
 
   // ── hand-lettered end card ───────────────────────────────────────────────
   function card(ctx, w, h, t, text) {
@@ -22,8 +23,10 @@
   }
 
   // ── Player ───────────────────────────────────────────────────────────────
-  function Player(film) {
-    this.film = film; this.t = 0; this.playing = false; this.camOverride = null; this.aspect = 'wide'; this.key = 'film';
+  // skins: { name: skin } so a film's tracks can name their styles as plain strings
+  function Player(film, o) {
+    o = o || {};
+    this.film = film; this.skins = o.skins || {}; this.cardText = o.cardText || 'MAXCOT'; this.t = 0; this.playing = false; this.camOverride = null; this.aspect = 'wide'; this.key = 'film';
     this.total = film.shots.reduce(function (a, s) { return Math.max(a, s.from + s.len); }, 0) + (film.end ? film.end.len : 0);
     this.seek(0);
   }
@@ -41,7 +44,7 @@
   Player.prototype.apply = function (b) { if (b.pose) this.actor.pose(b.pose); if (b.look) this.actor.gaze = b.look; };
   Player.prototype.seek = function (t) {
     this.t = K.clamp(t, 0, this.total); this.who = this.whoAt(this.t);
-    this.actor = new Rig.Actor({ who: this.who, t: this.t });
+    this.actor = new Actor({ who: this.who, t: this.t });
     var self = this; this.beats().forEach(function (b) { if (b.t <= self.t) self.apply(b); });
     this.actor.snap();
   };
@@ -62,20 +65,20 @@
   Player.prototype.render = function (ctx, w, h, o) {
     o = o || {};
     var endFrom = this.total - (this.film.end ? this.film.end.len : 0);
-    if (this.t >= endFrom && this.film.end) { card(ctx, w, h, this.t - endFrom, o.cardText || 'MAXCOT'); return; }
+    if (this.t >= endFrom && this.film.end) { card(ctx, w, h, this.t - endFrom, o.cardText || this.cardText); return; }
     var seg = this.styleAt(this.t), cam = this.camera(o.camIndex), F = this.actor.frame(), t = this.t;
-    var cm = root.Ch.camera(F.P, w, h, cam.frame || 'full');
+    var cm = camera(F.P, w, h, cam.frame || 'full'), skins = this.skins, sk = function (n) { return skins[n] || skins.pencil; };
     if (cam.kind === 'handheld') { cm.cx += K.noise(t * 1.3, 1) * w * 0.02; cm.cy += K.noise(t * 1.1, 2) * h * 0.02; }
     var shot = this.shotAt(t); if (cam.kind === 'push' && shot) cm.unit *= 1 + 0.15 * (t - shot.from) / shot.len;
     var key = this.key + (o.camIndex == null ? '' : o.camIndex);
-    var opts = { style: seg.style, palette: o.palette, t: o.t == null ? root.performance.now() / 1000 : o.t, key: key, cam: cm };
+    var opts = { skin: sk(seg.style), palette: o.palette, t: o.t == null ? performance.now() / 1000 : o.t, key: key, cam: cm };
     var since = t - (seg.from || 0);
     if (seg.blend === 'wipe' && since >= 0 && since < 0.3) {
       var prev = this.styleAt((seg.from || 0) - 0.001);
-      root.Ch.render(ctx, w, h, F, Object.assign({}, opts, { style: prev.style }));
+      render(ctx, w, h, F, Object.assign({}, opts, { skin: sk(prev.style) }));
       ctx.save(); ctx.beginPath(); ctx.rect(0, 0, w * since / 0.3, h); ctx.clip();
-      root.Ch.render(ctx, w, h, F, opts); ctx.restore();
-    } else root.Ch.render(ctx, w, h, F, opts);
+      render(ctx, w, h, F, opts); ctx.restore();
+    } else render(ctx, w, h, F, opts);
   };
 
   // ── Editor: shots / camera / who plays it / style ───────────────────────
@@ -128,7 +131,7 @@
     var hatch = el('div', 'blk hatch'); self.place(hatch, 0, endFrom); self.rows.who.lane.appendChild(hatch);
     ['who', 'style'].forEach(function (row) {
       (F.tracks[row] || []).forEach(function (seg, i) {
-        var label = row === 'who' ? (Design.CAST[seg.who] || {}).label || seg.who : (Skins[seg.style] || {}).label || seg.style;
+        var label = row === 'who' ? (CAST[seg.who] || {}).label || seg.who : (self.player.skins[seg.style] || {}).label || seg.style;
         var b = el('div', 'blk edit' + (self.sel && self.sel.row === row && self.sel.i === i ? ' sel' : ''));
         b.innerHTML = '<i class="grip">∷</i>' + label;
         var hl = el('span', 'h l'), hr = el('span', 'h r'); b.appendChild(hl); b.appendChild(hr);
@@ -145,8 +148,8 @@
     var self = this, L = this.player.film.tracks[row], seg = L[i], x0 = e.clientX, v0 = seg[edge];
     var lo = edge === 'from' ? (i > 0 ? L[i - 1].to : 0) : seg.from + 0.2, hi = edge === 'to' ? (L[i + 1] ? L[i + 1].from : this.player.total) : seg.to - 0.2;
     var move = function (ev) { seg[edge] = Math.round(K.clamp(v0 + (ev.clientX - x0) / self.pps, lo, hi) * 20) / 20; self.layout(); if (self.onChange) self.onChange(); };
-    var up = function () { root.removeEventListener('mousemove', move); root.removeEventListener('mouseup', up); };
-    root.addEventListener('mousemove', move); root.addEventListener('mouseup', up);
+    var up = function () { window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up); };
+    window.addEventListener('mousemove', move); window.addEventListener('mouseup', up);
   };
   Editor.prototype.select = function (row, i) {
     var L = this.player.film.tracks[row] || [];
@@ -166,5 +169,5 @@
     for (var k in this.aspects) this.aspects[k].classList.toggle('on', k === P.aspect);
   };
 
-  root.FilmKit = { Player: Player, Editor: Editor, card: card };
-})(window);
+export { Player, Editor, card };
+

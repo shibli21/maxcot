@@ -1,15 +1,11 @@
 {
-  "name": "maxcot",
-  "version": "0.1.0",
-  "description": "A character animation studio drawn entirely in code: one rig, 26 skins, a film timeline, driven by a musical score.",
-  "license": "MIT",
+  "name": "maxcot-workspace",
   "private": true,
   "type": "module",
+  "workspaces": ["packages/*", "apps/*"],
   "scripts": {
-    "serve": "bunx serve .",
-    "record": "bun tools/record.mjs"
-  },
-  "devDependencies": {
-    "puppeteer-core": "^25.18.1"
+    "dev": "bun --filter @maxcot/studio dev",
+    "build": "bun --filter @maxcot/studio build",
+    "record": "bun apps/studio/scripts/record.mjs"
   }
 }

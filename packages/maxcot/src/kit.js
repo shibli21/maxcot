@@ -1,8 +1,6 @@
 // engine/kit.js: the shared toolkit. Maths, seeded noise, path helpers and
 // the generic "toon" renderer that most skins build on. Pure code, no assets.
-(function (root) {
-  'use strict';
-  var K = root.MaxcotKit = {};
+const K = {};
 
   // ── maths ────────────────────────────────────────────────────────────────
   K.clamp = function (v, a, b) { return v < a ? a : v > b ? b : v; };
@@ -158,11 +156,23 @@
     });
   };
 
+  // ── canvases: injectable, so the renderer also runs in workers and Node ──
+  K.createCanvas = function (w, h) {
+    if (typeof document !== 'undefined') { var c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
+    if (typeof OffscreenCanvas !== 'undefined') return new OffscreenCanvas(w, h);
+    throw new Error('maxcot: no canvas available. Call setCanvasFactory((w, h) => canvas) first.');
+  };
+  K.setCanvasFactory = function (fn) { K.createCanvas = fn; };
+
+  // ── per-skin dials (Tune panel); skins read them with K.tv(key, fallback) ──
+  K.tune = {};
+  K.tv = function (k, d) { return k in K.tune ? K.tune[k] : d; };
+
   // ── offscreen buffers (reused, keyed) ────────────────────────────────────
   var BUF = {};
   K.buffer = function (key, w, h) {
     var b = BUF[key];
-    if (!b) { b = BUF[key] = document.createElement('canvas'); b.ctx = b.getContext('2d', { willReadFrequently: true }); }
+    if (!b) { b = BUF[key] = K.createCanvas(w, h); b.ctx = b.getContext('2d', { willReadFrequently: true }); }
     if (b.width !== w || b.height !== h) { b.width = w; b.height = h; }
     return b;
   };
@@ -172,7 +182,7 @@
   K.paper = function (ctx, w, h, tint, amt) {
     var key = tint + (amt || 1), g = grain[key];
     if (!g) {
-      g = grain[key] = document.createElement('canvas'); g.width = g.height = 256;
+      g = grain[key] = K.createCanvas(256, 256);
       var c = g.getContext('2d'), rnd = K.rng(7); c.fillStyle = tint; c.fillRect(0, 0, 256, 256);
       for (var i = 0; i < 2600 * (amt || 1); i++) {
         var a = rnd() * 0.05; c.fillStyle = rnd() < 0.5 ? 'rgba(0,0,0,' + a + ')' : 'rgba(255,255,255,' + a * 2 + ')';
@@ -244,4 +254,5 @@
     if (part.shade != null && (part.fill === 'body' || part.fill === 'side' || part.fill === 'hand')) return K.shadeHex(c, part.shade);
     return c;
   };
-})(window);
+export default K;
+export { K };

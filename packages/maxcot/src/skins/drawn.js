@@ -1,10 +1,8 @@
 // engine/skins/drawn.js: DRAWN. Things a hand did with a tool.
 // Each skin: { name, label, group, about, fps, hold, ground: { css, draw }, params, draw(S, ctx, view) }
-(function (root) {
-  'use strict';
-  var K = root.MaxcotKit, Skins = root.CharacterSkins = root.CharacterSkins || {};
-  K.tune = K.tune || {};
-  var tv = K.tv = function (k, d) { return k in K.tune ? K.tune[k] : d; };
+import K from '../kit.js';
+const Skins = {};
+  var tv = K.tv;
   var PAPER = '#f2f1ea';
   function paper(ctx, w, h) { K.paper(ctx, w, h, PAPER, 1); }
 
@@ -184,4 +182,5 @@
       ctx.filter = 'none';
     }
   };
-})(window);
+export const { pencil, sketch, ballpoint, felttip, inkbleed, inkpunch, gloss } = Skins;
+

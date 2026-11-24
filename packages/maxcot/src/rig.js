@@ -4,9 +4,8 @@
 // libraries: body moves (B), expressions (E), mouths (M) and hand shapes (H).
 // The Actor springs every channel toward its target, so any pose can follow
 // any other with no in-betweens authored by hand.
-(function (root) {
-  'use strict';
-  var Design = root.MaxcotDesign;
+import K from './kit.js';
+import * as Design from './design.js';
 
   // ── channels ─────────────────────────────────────────────────────────────
   var CH = {
@@ -236,16 +235,16 @@
     C.x += C.shake * 0.014 * Math.sin(t * 53); C.lean += C.shake * 0.02 * Math.sin(t * 41);
     C.lean += P['rest.lean'] || 0; C.twist += P['rest.twist'] || 0;
     if (tOverride == null && this.t > this.blink && this.disc.eyeMode === 'open') {
-      var b = 1 - Math.sin(K().clamp((this.t - this.blink) / 0.16, 0, 1) * Math.PI);
+      var b = 1 - Math.sin(K.clamp((this.t - this.blink) / 0.16, 0, 1) * Math.PI);
       C['eyes.open.L'] *= b; C['eyes.open.R'] *= b;
     }
     if (this.gaze === 'us') { C['eyes.lookX'] *= 0.2; C['eyes.lookY'] *= 0.2; }
     return { P: P, C: C, D: this.disc, t: t, who: this.who };
   };
-  function K() { return root.MaxcotKit; }
 
-  root.MaxcotRig = {
+  export const Rig = {
     CH: CH, DISC: DISC, B: B, E: E, M: M, H: H, P: P, EY: EY, SECTIONS: SECTIONS,
     resolve: resolve, layerOf: layerOf, Actor: Actor, both: both
   };
-})(window);
+export { CH, DISC, B, E, M, H, P, EY, SECTIONS, resolve, layerOf, Actor, both };
+export default Rig;

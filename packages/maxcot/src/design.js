@@ -3,8 +3,6 @@
 //   [key, group, label, help, min, max, default]
 // The studio builds its Design panel from this table, and every cast member is
 // just a set of overrides on top of it. Same rig, new coat.
-(function (root) {
-  'use strict';
 
   var DESIGN = [
     ['body.w', 'body', 'Width', 'Half the width of the block, in body units.', 0.45, 1.7, 1.0],
@@ -104,5 +102,5 @@
     return out;
   }
 
-  root.MaxcotDesign = { DESIGN: DESIGN, DEFAULTS: DEFAULTS, CAST: CAST, cast: cast, resolve: resolve };
-})(window);
+export { DESIGN, DEFAULTS, CAST, cast, resolve };
+export default { DESIGN, DEFAULTS, CAST, cast, resolve };

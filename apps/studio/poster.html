@@ -4,20 +4,14 @@
 <body>
 <!-- The repository's social preview (1280×640), drawn by the engine itself. -->
 <canvas id="c" width="1280" height="640"></canvas>
-<script src="../engine/kit.js"></script>
-<script src="../engine/design.js"></script>
-<script src="../engine/rig.js"></script>
-<script src="../engine/character.js"></script>
-<script src="../engine/skins/drawn.js"></script>
-<script src="../engine/skins/print.js"></script>
-<script src="../engine/skins/screens.js"></script>
-<script src="../engine/skins/glitch.js"></script>
-<script src="../filmkit/film.js"></script>
-<script>
-  var K = MaxcotKit, c = document.getElementById('c'), ctx = c.getContext('2d'), W = c.width, H = c.height;
+<script type="module">
+  import { kit as K, Actor, render } from 'maxcot';
+  import { skinsByName } from 'maxcot/skins';
+  import { card } from 'maxcot/film';
+  var S = skinsByName(), c = document.getElementById('c'), ctx = c.getContext('2d'), W = c.width, H = c.height;
   K.paper(ctx, W, H, '#f2f1ea', 1);
   var title = document.createElement('canvas'); title.width = 1100; title.height = 400;
-  FilmKit.card(title.getContext('2d'), title.width, title.height, 2, 'MAXCOT');
+  card(title.getContext('2d'), title.width, title.height, 2, 'MAXCOT');
   ctx.drawImage(title, (W - title.width) / 2, 418 - title.height / 2);
   var cast = [
     ['max', 'pencil', 'wave'], ['girl', 'felttip', 'feel-happy'], ['boss', 'gigposter', 'deal'],
@@ -26,8 +20,8 @@
   var tw = 196, th = 236, gap = 12, x0 = (W - (cast.length * tw + (cast.length - 1) * gap)) / 2, y0 = 36;
   cast.forEach(function (it, i) {
     var t = document.createElement('canvas'); t.width = tw * 2; t.height = th * 2;
-    var a = new MaxcotRig.Actor({ who: it[0] }); a.pose(it[2]).snap(); a.gaze = 'us';
-    Ch.render(t.getContext('2d'), t.width, t.height, a.frame(0.8), { style: it[1], palette: it[3], t: 0.8, key: 'p' + i, zoom: 1.3 });
+    var a = new Actor({ who: it[0] }); a.pose(it[2]).snap(); a.gaze = 'us';
+    render(t.getContext('2d'), t.width, t.height, a.frame(0.8), { skin: S[it[1]], palette: it[3], t: 0.8, key: 'p' + i, zoom: 1.3 });
     var x = x0 + i * (tw + gap);
     ctx.save(); ctx.beginPath(); ctx.roundRect(x, y0, tw, th, 6); ctx.clip(); ctx.drawImage(t, x, y0, tw, th); ctx.restore();
     ctx.strokeStyle = 'rgba(0,0,0,0.12)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.roundRect(x + 0.5, y0 + 0.5, tw - 1, th - 1, 6); ctx.stroke();

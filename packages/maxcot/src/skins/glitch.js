@@ -1,13 +1,15 @@
 // engine/skins/glitch.js: GLITCH. Signal (the picture breaks) and time (frames leak into each other).
 // Each one renders an ordinary skin into a buffer, then damages it.
-(function (root) {
-  'use strict';
-  var K = root.MaxcotKit, Skins = root.CharacterSkins = root.CharacterSkins || {};
+import K from '../kit.js';
+import * as drawn from './drawn.js';
+import * as print from './print.js';
+import * as screens from './screens.js';
+const Skins = {};
   var tv = function (k, d) { return K.tv ? K.tv(k, d) : d; };
-  var FX = root.MaxcotFX = root.MaxcotFX || { wind: 0.35 };
+  var BY_NAME = Object.assign({}, drawn, print, screens, Skins);   // glitch skins damage other skins, chosen by name
 
   function inner(S, view, name, tag, ground) {
-    var buf = K.buffer(tag + S.key, S.w, S.h), c = buf.ctx, sk = Skins[name] || Skins.pencil;
+    var buf = K.buffer(tag + S.key, S.w, S.h), c = buf.ctx, sk = BY_NAME[name] || drawn.pencil;
     c.setTransform(1, 0, 0, 1, 0, 0); c.globalCompositeOperation = 'source-over'; c.globalAlpha = 1; c.filter = 'none';
     c.clearRect(0, 0, S.w, S.h);
     if (ground !== false) { if (sk.ground && sk.ground.draw) sk.ground.draw(c, S.w, S.h, view.t, K, view); else { c.fillStyle = (sk.ground && sk.ground.css) || '#fff'; c.fillRect(0, 0, S.w, S.h); } }
@@ -105,7 +107,7 @@
       var g = c.createLinearGradient(wx, 0, wx + ww, 0); g.addColorStop(0, '#0a246a'); g.addColorStop(1, '#a6caf0'); c.fillStyle = g; c.fillRect(wx + 3, wy + 3, ww - 6, bar);
       c.fillStyle = '#fff'; c.font = 'bold ' + Math.floor(bar * 0.62) + 'px Tahoma, sans-serif'; c.textBaseline = 'middle'; c.fillText('max.exe', wx + 8, wy + 3 + bar / 2);
       c.fillStyle = '#fff'; c.fillRect(wx + 4, wy + bar + 6, ww - 8, wh - bar - 10);
-      Skins.sketch.draw(S, c, view);
+      drawn.sketch.draw(S, c, view);
       c.restore();
       ctx.drawImage(buf, 0, 0);
     }
@@ -116,7 +118,7 @@
     name: 'pixelwind', label: 'Pixel wind', group: 'time', about: 'A wind that takes the figure apart, a block at a time, off to the right.',
     fps: 24, hold: { redraw: true }, ground: { css: '#f2f1ea', draw: paper },
     draw: function (S, ctx, view) {
-      var src = inner(S, view, tv('pixelwind.base', 'pencil'), 'pw0', false), u = S.unit, b = S.body, amt = K.clamp(FX.wind, 0, 1);
+      var src = inner(S, view, tv('pixelwind.base', 'pencil'), 'pw0', false), u = S.unit, b = S.body, amt = K.clamp(tv('pixelwind.wind', 0.3), 0, 1);
       var rnd = K.rng(1234), bs = Math.max(3, Math.round(u * 0.018)), t = view.t, cut = b.x + b.w * (1.15 - amt * 1.3);
       ctx.save(); ctx.beginPath(); ctx.rect(0, 0, cut, S.h); ctx.clip(); ctx.drawImage(src, 0, 0); ctx.restore();
       var N = 260 + amt * 900;
@@ -145,4 +147,5 @@
       }
     }
   };
-})(window);
+export const { glitch, datamosh, databend, feedback, trails, pixelwind, stylemosh } = Skins;
+

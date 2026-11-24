@@ -1,0 +1,17 @@
+{
+  "name": "maxcot",
+  "version": "0.1.0",
+  "description": "A character animation engine drawn entirely in code: one rig, 26 skins, a film player and a bars-and-beats sequencer.",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.js",
+    "./skins": "./src/skins/index.js",
+    "./film": "./src/film/index.js",
+    "./score": "./src/score/index.js"
+  },
+  "files": ["src", "README.md", "LICENSE"],
+  "repository": { "type": "git", "url": "git+https://github.com/shibli21/maxcot.git", "directory": "packages/maxcot" },
+  "keywords": ["animation", "character", "canvas", "procedural", "generative", "mascot", "rig"]
+}

@@ -1,8 +1,7 @@
-// bts/audio.js: the beat under the score, synthesised live with WebAudio.
+// beat.js: the beat under the score, synthesised live with WebAudio.
 // No samples: kick, clap, hats, bass and a chord stab are all oscillators and noise.
 // It is also the master clock while it runs.
-(function (root) {
-  'use strict';
+const root = window;
   function Beat(bpm) {
     this.bpm = bpm; this.ac = null; this.on = true; this.running = false; this.step = 0; this.t0 = 0; this.timer = null;
   }
@@ -78,5 +77,5 @@
     for (var j = 0; j < bytes.length; j += step) bin += String.fromCharCode.apply(null, bytes.subarray(j, j + step));
     return root.btoa(bin);
   };
-  root.BTSBeat = Beat;
-})(window);
+export default Beat;
+
