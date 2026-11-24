@@ -7,6 +7,7 @@
 import K from './kit.js';
 import * as Design from './design.js';
 import type { Channels, DesignValues, Discrete, Frame } from './types.js';
+import type { Manner } from './design.js';
 
 /** Channel targets and discrete switches (hand shapes, eye mode, prop) by key. */
 export type PoseValues = Record<string, number | string>;
@@ -224,6 +225,8 @@ export class Actor {
   gaze: string | null = null;
   /** How fast a recast morphs the design. */
   morph = 7;
+  /** How this actor moves on its own: weight, idle habit, gaze habit, rest pose. */
+  manner!: Manner;
 
   constructor(o: ActorOptions = {}) {
     this.who = o.who || 'max';
@@ -231,6 +234,15 @@ export class Actor {
     this.ch = Object.assign({}, CH); this.to = Object.assign({}, CH);
     this.disc = Object.assign({}, DISC); this.discTo = Object.assign({}, DISC);
     this.t = o.t || 0; this.blink = 2 + Math.random() * 2;
+    this.setManner(Design.mannerOf(this.who));
+    if (this.manner.rest !== 'rest') this.pose(this.manner.rest).snap();
+  }
+  /** Change how the actor moves. Weight sets the springs: heavy is slow and settles, light snaps and overshoots. */
+  setManner(m: Partial<Manner>): this {
+    this.manner = Object.assign({}, this.manner || Design.mannerOf('max'), m);
+    const w = K.clamp(this.manner.weight, 0, 1);
+    this.stiff = 15 + (0.5 - w) * 16; this.damp = 0.68 + (w - 0.5) * 0.4;
+    return this;
   }
   /** Spring toward a pose (or a list of poses). Only its layer's channels change. */
   pose(name: string | string[]): this {
@@ -241,7 +253,12 @@ export class Actor {
     return this;
   }
   /** Recast: morph the design toward another actor. */
-  cast(who: string): this { this.who = who; this.designTo = Design.resolve(who); return this; }
+  cast(who: string): this {
+    const wasResting = this.poseName === this.manner.rest;
+    this.who = who; this.designTo = Design.resolve(who); this.setManner(Design.mannerOf(who));
+    if (wasResting && this.manner.rest !== this.poseName) this.pose(this.manner.rest);
+    return this;
+  }
   /** Morph one design dial. */
   set(k: string, v: number): this { this.designTo[k] = v; return this; }
   /** Jump straight to every target. */
@@ -265,7 +282,8 @@ export class Actor {
   frame(tOverride?: number | null): Frame {
     var t = tOverride == null ? this.t : tOverride, C: Channels = Object.assign({}, this.ch), P = this.design, idle = this.idle;
     var c = function (k: string): number { return C[k]!; };
-    var fl = (P['rest.float'] == null ? 0.5 : P['rest.float']) * idle;
+    var habit = this.manner ? this.manner.idle : 'none', gazeHabit = this.manner ? this.manner.gaze : 'steady';
+    var fl = (P['rest.float'] == null ? 0.5 : P['rest.float']) * idle * (habit === 'still' ? 0.35 : 1);
     C.y = c('y') + fl * 0.045 * Math.sin(t * 1.7);
     C.squash = c('squash') + idle * 0.014 * Math.sin(t * 3.4);
     C['handL.y'] = c('handL.y') + fl * 0.04 * Math.sin(t * 1.7 + 0.9); C['handR.y'] = c('handR.y') + fl * 0.04 * Math.sin(t * 1.7 + 1.4);
@@ -273,6 +291,21 @@ export class Actor {
     C.y = c('y') + c('hop') * 0.1 * Math.abs(Math.sin(t * 8)); C.squash = c('squash') - c('hop') * 0.05 * Math.cos(t * 16);
     C.x = c('x') + c('shake') * 0.014 * Math.sin(t * 53); C.lean = c('lean') + c('shake') * 0.02 * Math.sin(t * 41);
     C.lean = c('lean') + (P['rest.lean'] || 0); C.twist = c('twist') + (P['rest.twist'] || 0);
+    // idle habits
+    if (habit === 'fidget') {
+      C['handR.rot'] = c('handR.rot') + K.noise(t * 0.9, 3) * 0.2 * idle; C['handL.rot'] = c('handL.rot') + K.noise(t * 0.8, 7) * 0.16 * idle;
+      C['handR.y'] = c('handR.y') + K.noise(t * 1.3, 4) * 0.03 * idle; C.twist = c('twist') + K.noise(t * 0.6, 5) * 0.06 * idle;
+    } else if (habit === 'bouncy') {
+      C.y = c('y') + 0.035 * idle * Math.abs(Math.sin(t * 3.2)); C.squash = c('squash') + 0.02 * idle * Math.sin(t * 6.4);
+    } else if (habit === 'sway') {
+      C.lean = c('lean') + 0.06 * idle * Math.sin(t * 1.1); C.twist = c('twist') + 0.04 * idle * Math.sin(t * 0.7);
+    }
+    // gaze habits (an explicit gaze or a stage look still wins)
+    if (this.gaze == null) {
+      if (gazeHabit === 'away') C['eyes.lookX'] = K.clamp(c('eyes.lookX') + K.noise(t * 0.2, 11) * 0.9, -1, 1);
+      else if (gazeHabit === 'darting') { var k = Math.floor(t / 0.9); C['eyes.lookX'] = K.clamp(c('eyes.lookX') + (K.hash(k * 7.13) - 0.5) * 1.3, -1, 1); C['eyes.lookY'] = K.clamp(c('eyes.lookY') + (K.hash(k * 3.31) - 0.5) * 0.6, -1, 1); }
+      else if (gazeHabit === 'us') { C['eyes.lookX'] = c('eyes.lookX') * 0.2; C['eyes.lookY'] = c('eyes.lookY') * 0.2; }
+    }
     if (tOverride == null && this.t > this.blink && this.disc.eyeMode === 'open') {
       var b = 1 - Math.sin(K.clamp((this.t - this.blink) / 0.16, 0, 1) * Math.PI);
       C['eyes.open.L'] = c('eyes.open.L') * b; C['eyes.open.R'] = c('eyes.open.R') * b;

@@ -88,7 +88,9 @@ checked field by field, so opening one from someone else can't run code.
 ```
 
 Open **Demos → Ensemble** in the studio to see a three-actor scene. Click an actor to make
-the panels edit it.
+the panels edit it. Each actor also has a **manner** (how heavy it is, its idle habit, where
+its eyes wander, its rest pose), shown in the Motion panel and set from a score with
+`{ manner: { weight: 0.2, idle: 'bouncy' }, on: 'boss' }`.
 
 Each verb (`create`, `enter`, `exit`, `shot`, `look`, `style`, `pose`, `who`, `set`, `play`, `camera`, `end` and the rest) is
 one function in the studio's `CMD` table, and the UI calls the same functions, so anything

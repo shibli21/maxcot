@@ -37,6 +37,8 @@ test('clicking an actor makes the panels edit it', async ({ page }) => {
   await page.waitForFunction(() => window.Studio);
   await page.click('#bFree');
   await page.selectOption('#demo', { label: 'Ensemble' });
+  // let layout settle (a resize clears and rescales the canvas) before measuring where actors are
+  await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
   const box = await page.evaluate(() => {
     const S = window.Studio, C = S.conductor; C.seek(C.timeOf([6, 3.5])); S.step(0.04);
     const kid = S.stage.S.actors.find((A) => A.F.who === 'child').body, r = document.querySelector('#main').getBoundingClientRect(), dpr = Math.min(devicePixelRatio || 1, 1.5);

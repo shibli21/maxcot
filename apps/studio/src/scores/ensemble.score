@@ -48,6 +48,8 @@
     { at: [9, 2], pose: 'wave' },
     { at: [9, 2], pose: 'wave', on: 'kid' },
     { at: [9, 2.5], pose: 'thumbsup', on: 'boss' },
+    // the boss loosens up
+    { at: [10, 1], manner: { weight: 0.2, idle: 'bouncy' }, on: 'boss' },
     { at: [10, 1], style: 'hologram', palette: 'cyan' },
     { at: [10, 3], style: 'neon' },
     { at: [11, 1], style: 'gigposter' },

@@ -2,7 +2,7 @@
 // the side panel (Styles, Tune, Poses, Design, Motion), the two code panes and
 // the transport. Every score command lands in CMD below; the UI calls the same
 // functions, so anything the score can do, a person can do by hand.
-import { kit as K, Actor, Character, Stage, CAST, DESIGN, POSES, POSE_SECTIONS, render, type DesignRow, type DesignValues, type Skin, type StageFraming } from 'maxcot';
+import { kit as K, Actor, Character, Stage, CAST, DESIGN, POSES, POSE_SECTIONS, render, type DesignRow, type DesignValues, type Manner, type Skin, type StageFraming } from 'maxcot';
 import { GROUPS, allSkins, skinsByName } from 'maxcot/skins';
 import { Editor, Player, card, type Film, type StyleSegment, type TrackName, type WhoSegment } from 'maxcot/film';
 import { createConductor, parseScore, type CommandContext, type Conductor, type ScheduledEvent, type ScoreEvent } from 'maxcot/score';
@@ -121,6 +121,7 @@ const CMD: Record<string, Command> = {
   shot(v, ev) { stage.shot(str(v) as StageFraming, ev.on as string | string[] | undefined, !!ev.cut); leaveSpecial(); src('stage'); },
   place(v, ev) { const id = ev.on != null ? String(ev.on) : ST.lead, at = Array.isArray(v) ? v : [v]; if (stage.has(id)) stage.place(id, num(at[0]), at[1] != null ? num(at[1]) : undefined); src('stage'); },
   spread() { stage.spread(); src('stage'); },
+  manner(v, ev) { actorFor(ev).setManner((v || {}) as Partial<Manner>); stage.dirty = true; if (ST.panel === 'Motion' && !ST.instant) openPanel('Motion'); src('manner'); },
   style(v, ev) {
     const name = str(v), palette = ev.palette as string | undefined;
     if (ST.mode === 'film' && ST.editRow === 'style' && editor) { editor.assign(name); markPicker(name); }
@@ -363,7 +364,15 @@ function buildPanel(): void {
     toggle(body, 'Construction lines', ST.guides, (on) => { ST.guides = on; });
     toggle(body, 'Eyes to camera', ST.actor.gaze === 'us', (on) => { ST.actor.gaze = on ? 'us' : null; });
   } else if (ST.panel === 'Motion') {
-    const a = ST.actor; body.appendChild(el('p', 'note', 'Every channel springs toward its pose. Stiffer is snappier, lower damping overshoots.'));
+    const a = ST.actor, m = a.manner;
+    body.appendChild(el('h4', null, 'Manner of ' + ST.selected));
+    body.appendChild(el('p', 'note', 'How this actor moves on its own. Click another actor on stage to edit theirs.'));
+    dial(body, 'm:weight', 'Weight', 0, 1, m.weight, 'Light and springy (0) to heavy and slow (1)', (v) => { a.setManner({ weight: v }); bump(); syncMotion(); });
+    choice(body, 'm:idle', 'Idle habit', ['none', 'still', 'fidget', 'bouncy', 'sway'], m.idle, (v) => { a.setManner({ idle: v as Manner['idle'] }); stage.dirty = true; });
+    choice(body, 'm:gaze', 'Gaze habit', ['steady', 'away', 'darting', 'us'], m.gaze, (v) => { a.setManner({ gaze: v as Manner['gaze'] }); stage.dirty = true; });
+    choice(body, 'm:rest', 'Rest pose', POSE_SECTIONS.attitudes.concat(POSE_SECTIONS.hands), m.rest, (v) => { a.setManner({ rest: v }); a.pose(v); stage.dirty = true; });
+    body.appendChild(el('h4', null, 'Fine tune'));
+    body.appendChild(el('p', 'note', 'Every channel springs toward its pose. Stiffer is snappier, lower damping overshoots.'));
     dial(body, 'm:stiff', 'Stiffness', 4, 40, a.stiff, '', (v) => { a.stiff = v; });
     dial(body, 'm:damp', 'Damping', 0.2, 1.2, a.damp, '', (v) => { a.damp = v; });
     dial(body, 'm:idle', 'Idle life', 0, 2, a.idle, '', (v) => { a.idle = v; });
@@ -377,6 +386,17 @@ function dial(host: HTMLElement, k: string, label: string, min: number, max: num
   row.title = help || ''; row.dataset.k = k; if (key) r.dataset.key = key;
   r.oninput = () => { o.textContent = (+r.value).toFixed(2); onInput(+r.value); };
   row.appendChild(el('span', null, label)); row.appendChild(r); row.appendChild(o); host.appendChild(row);
+}
+function choice(host: HTMLElement, k: string, label: string, options: string[], value: string, onChange: (v: string) => void): void {
+  const row = el('label', 'dial'), sel = el('select');
+  options.forEach((o) => { const opt = el('option', null, o); opt.value = o; sel.appendChild(opt); });
+  sel.value = value; sel.onchange = () => onChange(sel.value); row.dataset.k = k;
+  row.appendChild(el('span', null, label)); row.appendChild(sel); row.appendChild(el('output')); host.appendChild(row);
+}
+/** Keep the spring dials in step after the weight changes them. */
+function syncMotion(): void {
+  const body = $('#panelBody'), set = (k: string, v: number) => { const r = body.querySelector<HTMLInputElement>('[data-k="' + k + '"] input'); if (r) { r.value = String(v); (r.nextSibling as HTMLElement).textContent = v.toFixed(2); } };
+  set('m:stiff', ST.actor.stiff); set('m:damp', ST.actor.damp);
 }
 function toggle(host: HTMLElement, label: string, on: boolean, fn: (on: boolean) => void): void {
   const l = el('label', 'dial'), c = el('input'); c.type = 'checkbox'; c.checked = on; c.onchange = () => fn(c.checked);
@@ -475,6 +495,16 @@ function validate(events: ScoreEvent[], lines: number[]): Mark[] {
     });
     if (e.on != null && !castIds.has(String(e.on))) out.push({ line, level: 'warn', message: "nobody called '" + e.on + "' has entered (use create or enter)" });
     if (e.enter != null && typeof e.enter === 'object' && (e.enter as { who?: string }).who && !CAST[(e.enter as { who: string }).who]) out.push({ line, level: 'warn', message: "no actor called '" + (e.enter as { who: string }).who + "'" });
+    if (e.manner != null) {
+      const mm = e.manner as Record<string, unknown>, ok: Record<string, string[]> = { idle: ['none', 'still', 'fidget', 'bouncy', 'sway'], gaze: ['steady', 'away', 'darting', 'us'] };
+      if (typeof mm !== 'object' || Array.isArray(mm)) out.push({ line, level: 'warn', message: 'manner is an object, e.g. { weight: 0.8, idle: \'sway\' }' });
+      else for (const key of Object.keys(mm)) {
+        if (key === 'weight') { if (typeof mm.weight !== 'number' || mm.weight < 0 || mm.weight > 1) out.push({ line, level: 'warn', message: 'weight goes from 0 (light) to 1 (heavy)' }); }
+        else if (key === 'rest') { if (!POSES[String(mm.rest)]) out.push({ line, level: 'warn', message: "no pose called '" + mm.rest + "'" }); }
+        else if (ok[key]) { if (!ok[key]!.includes(String(mm[key]))) out.push({ line, level: 'warn', message: key + ' is one of ' + ok[key]!.join(', ') }); }
+        else out.push({ line, level: 'warn', message: 'manner has weight, idle, gaze and rest; not `' + key + '`' });
+      }
+    }
     if (e.palette != null && !PALETTES.has(String(e.palette))) out.push({ line, level: 'warn', message: "no palette called '" + e.palette + "'" });
     if (e.set != null && typeof e.to !== 'number') out.push({ line, level: 'warn', message: '`set` needs `to: <number>`' });
   });
@@ -602,6 +632,7 @@ function showSource(kind: string, name?: string): void {
   if (kind === 'style') { const s = skin(n), f = SKIN_FILE[s.group]!; file = LIB + 'skins/' + f[0] + '.ts'; view = fileAt(f[1], 'Skins.' + s.name + ' = {'); }
   else if (kind === 'pose') { file = LIB + 'rig.ts'; view = fileAt(rigSrc, n.indexOf('feel-') === 0 ? "feel('" + n.slice(5) + "'" : "'" + n + "'"); }
   else if (kind === 'who') { file = LIB + 'design.ts'; view = fileAt(designSrc, "cast('" + n + "'"); }
+  else if (kind === 'manner') { file = LIB + 'design.ts'; view = fileAt(designSrc, 'const MANNERS'); }
   else if (kind === 'set') { file = LIB + 'design.ts'; view = fileAt(designSrc, "['" + n + "'"); }
   else if (kind === 'film') {
     // the live film, so edits made in the timeline show up here

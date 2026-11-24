@@ -113,6 +113,7 @@ button { font: inherit; }
 .dial { display: grid; grid-template-columns: 96px 1fr 44px; align-items: center; gap: 8px; font-size: 12px; padding: 2px 4px; border-radius: 3px; }
 .dial.on { background: #f3d9a8; }
 .dial input { width: 100%; accent-color: #111; }
+.dial select { width: 100%; font: inherit; font-size: 12px; padding: 2px 4px; border: 1px solid #d5d3cb; background: #fff; }
 .dial output { text-align: right; font-variant-numeric: tabular-nums; }
 .note { font-size: 12px; color: #666; line-height: 1.45; }
 

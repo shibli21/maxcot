@@ -66,6 +66,7 @@ under a point.
 
 - **Poses** are layered: a pose on the `hands` layer leaves the face alone, and an `eyes` pose leaves the hands alone. There are 95, listed in `POSE_SECTIONS` (attitudes, feelings, eyes, mouth, hands, body), e.g. `thinking`, `feel-crying`, `eyes-suspicious`, `mouth-smirk`, `count3`, `thumbsup`.
 - **Actors** (`CAST`) are just overrides of the design table: `max`, `child`, `girl`, `boss`, `clerk`, `teen`, `professor`, `oldman`. Add your own with `cast(key, label, about, values)`.
+- **Manner**: each actor also moves like itself. `weight` sets its springs (the boss is heavy and settles slowly, the child is light and springy), `idle` is a habit (`still`, `fidget`, `bouncy`, `sway`), `gaze` is where its eyes wander (`steady`, `away`, `darting`, `us`), and `rest` is the pose it falls back to. Recasting swaps the manner too; change it with `actor.setManner({ weight: 0.9, idle: 'sway' })`.
 - **Dials** (`DESIGN`): one row per dial, `[key, group, label, help, min, max, default]`. Body size, taper, corners, eye shape, lids, brows, mouth, hands, view angle and more.
 
 ## Sequencing with a score

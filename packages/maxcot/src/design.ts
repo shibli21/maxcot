@@ -3,7 +3,19 @@ import type { DesignValues } from './types.js';
 
 /** [key, group, label, help, min, max, default] */
 export type DesignRow = [string, string, string, string, number, number, number];
-export interface CastMember { key: string; label: string; about: string; values: DesignValues }
+/** How an actor moves when nobody is telling it what to do. */
+export type IdleHabit = 'none' | 'still' | 'fidget' | 'bouncy' | 'sway';
+export type GazeHabit = 'steady' | 'away' | 'darting' | 'us';
+export interface Manner {
+  /** 0 light and springy, 1 heavy and slow. 0.5 is neutral. */
+  weight: number;
+  idle: IdleHabit;
+  gaze: GazeHabit;
+  /** The pose it falls back to. */
+  rest: string;
+}
+export const DEFAULT_MANNER: Manner = { weight: 0.5, idle: 'none', gaze: 'steady', rest: 'rest' };
+export interface CastMember { key: string; label: string; about: string; values: DesignValues; manner: Manner }
 // DESIGN: what the character IS. One row per dial:
 //   [key, group, label, help, min, max, default]
 // The studio builds its Design panel from this table, and every cast member is
@@ -61,7 +73,9 @@ export interface CastMember { key: string; label: string; about: string; values:
   // CAST: same rig, different actor. cast(key, label, about, values)
   var CAST: Record<string, CastMember> = {};
   /** Add an actor: a label, a one-line description and the dials it overrides. */
-  function cast(key: string, label: string, about: string, v: DesignValues): void { CAST[key] = { key: key, label: label, about: about, values: v }; }
+  function cast(key: string, label: string, about: string, v: DesignValues, manner: Partial<Manner> = {}): void {
+    CAST[key] = { key: key, label: label, about: about, values: v, manner: Object.assign({}, DEFAULT_MANNER, manner) };
+  }
 
   cast('max', 'Max', 'The fridge. The original.', {});
   cast('child', 'Child', 'Short and round, eyes too big for the face.', {
@@ -99,7 +113,20 @@ export interface CastMember { key: string; label: string; about: string; values:
     'eyes.size': 0.14, 'eyes.aspect': 0.85, 'eyes.shape': 1, 'eyes.bag': 1, 'eyes.upper': 0.35,
     'brows.len': 0.34, 'brows.thick': 0.07, 'brows.arch': 0.1, 'brows.gap': 0.12
   });
+  // manners: the same rig, moving like different people
+  const MANNERS: Record<string, Partial<Manner>> = {
+    child: { weight: 0.15, idle: 'bouncy', gaze: 'darting', rest: 'at-ease' },
+    girl: { weight: 0.2, idle: 'bouncy', gaze: 'us', rest: 'pleased' },
+    boss: { weight: 0.9, idle: 'still', gaze: 'steady', rest: 'hips' },
+    oldman: { weight: 0.75, idle: 'sway', gaze: 'steady', rest: 'at-ease' },
+    clerk: { weight: 0.3, idle: 'fidget', gaze: 'away', rest: 'rub' },
+    teen: { weight: 0.55, idle: 'sway', gaze: 'away', rest: 'slump' },
+    professor: { weight: 0.7, idle: 'still', gaze: 'steady', rest: 'counting' }
+  };
+  for (const k in MANNERS) Object.assign(CAST[k]!.manner, MANNERS[k]);
   CAST.kid = CAST.child!;
+  /** An actor's manner (a copy you can change). */
+  function mannerOf(who?: string): Manner { return Object.assign({}, ((who && CAST[who]) || CAST.max!).manner); }
 
   /** The full design for an actor: DESIGN defaults with its overrides on top. */
   function resolve(who?: string): DesignValues {
@@ -109,5 +136,5 @@ export interface CastMember { key: string; label: string; about: string; values:
     return out;
   }
 
-export { DESIGN, DEFAULTS, CAST, cast, resolve };
-export default { DESIGN, DEFAULTS, CAST, cast, resolve };
+export { DESIGN, DEFAULTS, CAST, cast, resolve, mannerOf };
+export default { DESIGN, DEFAULTS, CAST, cast, resolve, mannerOf };
