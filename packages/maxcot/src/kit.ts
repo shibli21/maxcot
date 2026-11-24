@@ -195,7 +195,7 @@ export const K = {
     throw new Error('maxcot: no canvas available. Call setCanvasFactory((w, h) => canvas) first.');
   },
   /** Supply canvases yourself: OffscreenCanvas in a worker, skia-canvas or @napi-rs/canvas in Node. */
-  setCanvasFactory(fn: (w: number, h: number) => CanvasLike): void { K.createCanvas = fn; },
+  setCanvasFactory(fn: (w: number, h: number) => object): void { K.createCanvas = fn as (w: number, h: number) => CanvasLike; },
 
   // ── per-skin dials (the Tune panel); skins read them with K.tv(key, fallback) ──
   tune: {} as Record<string, number | string>,
