@@ -199,6 +199,9 @@ export type PoseSection = 'attitudes' | 'feelings' | 'eyes' | 'mouth' | 'hands' 
     return { layer: layer || 'all', values: values };
   }
 
+// Dials that pick a kind (eye style, brow style...) switch outright instead of morphing.
+const CHOICE_DIALS = new Set(Design.DESIGN.filter((r) => r[7]).map((r) => r[0]));
+
 // ── Actor: springs + idle life ───────────────────────────────────────────
 export interface ActorOptions { who?: string; t?: number }
 
@@ -275,7 +278,7 @@ export class Actor {
     }
     if (this.t >= (this.switchAt || 0)) Object.assign(this.disc, this.discTo);
     var a = 1 - Math.exp(-this.morph * dt);
-    for (k in this.designTo) if (typeof this.designTo[k] === 'number') this.design[k] = this.design[k]! + (this.designTo[k]! - this.design[k]!) * a;
+    for (k in this.designTo) if (typeof this.designTo[k] === 'number') this.design[k] = CHOICE_DIALS.has(k) ? this.designTo[k]! : this.design[k]! + (this.designTo[k]! - this.design[k]!) * a;
     if (this.t > this.blink + 0.16) this.blink = this.t + 1.8 + Math.random() * 3.2;
   }
   /** The frame the renderer sees: channels plus idle breathing, blinks, waves and hops. */

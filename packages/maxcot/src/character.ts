@@ -128,7 +128,9 @@ export interface SceneView { w: number; h: number; cam: Camera; guides?: boolean
     S.mesh = mesh(8, 10);
 
     // ── the face ───────────────────────────────────────────────────────────
-    var cheat = (P['eyes.cheat'] || 0) * sin(yaw) * -W * 0.14;
+    var cheat = (P['eyes.cheat'] || 0) * sin(yaw) * -W * 0.14 + (P['eyes.slide'] || 0) * (W - 2 * bev) * 0.2;
+    var eyeKind = Math.round(P['eyes.style'] || 0), browKind = Math.round(P['brows.style'] || 0), teethKind = Math.round(P['teeth.style'] || 0);
+    var bow = P['eyes.bow'] || 0, flatTop = P['eyes.flat'] || 0, eyeTaper = P['eyes.taper'] || 0;
     var splitV: number | null = P['body.split']! > 0.01 ? -Hh / 2 + P['body.split']! * Hh : null;
     var eyeV = Hh / 2 - bev - P['eyes.height']! * (Hh - 2 * bev) * 0.9;
     var ew0 = P['eyes.size']! * 0.55 * size, eh0 = ew0 * P['eyes.aspect']!;
@@ -154,6 +156,7 @@ export interface SceneView { w: number; h: number; cam: Camera; guides?: boolean
 
     eyes.forEach(function (e) { eyeParts(e); });
     browParts();
+    curlPart();
     mouthParts();
     fxParts();
     if (hands[0]!.z >= -0.02) pushHand(hands[0]!);
@@ -181,6 +184,23 @@ export interface SceneView { w: number; h: number; cam: Camera; guides?: boolean
       }
       return lines;
     }
+    /** Eye-shape dials: bowed sides, a flat top, a taper. All zero = the plain superellipse. */
+    function shapeEye(pts: Pt[], e: EyeSpec): Pt[] {
+      if (!bow && !flatTop && !eyeTaper) return pts;
+      return pts.map(function (q): Pt {
+        var dx = (q[0] - e.cu) / e.ew, dy = (q[1] - e.cv) / e.eh;
+        var x = dx * (1 + bow * 0.3 * (1 - dy * dy)) * (1 - eyeTaper * 0.35 * (1 - dy) / 2), y = dy;
+        if (flatTop > 0 && y > 0) y = y * (1 - flatTop * 0.5) + flatTop * 0.5 * Math.min(1, y * 2);
+        return [e.cu + x * e.ew, e.cv + y * e.eh];
+      });
+    }
+    /** A rolled lower lip: a short curve under the mouth. */
+    function lipRoll(v: number, open: number): void {
+      var roll = P['mouth.roll'] || 0; if (roll < 0.02) return;
+      var mvv = v - 0.025 - roll * 0.02 - open * 0.15, wd = P['mouth.width']! * (W - 2 * bev) * 0.22, cu0 = cheat * 0.8, pts: Pt[] = [];
+      for (var k = 0; k <= 8; k++) { var x = -1 + k / 4; pts.push([cu0 + x * wd, mvv - roll * 0.012 * (1 - x * x)]); }
+      parts.push({ role: 'lip', pts: faceLoop(pts), line: true, lw: 0.8 + roll * 0.6 });
+    }
     function superEllipse(cu: number, cv: number, ew: number, eh: number, n: number, k: number): Pt[] {
       var pts: Pt[] = [];
       for (var j = 0; j < k; j++) {
@@ -206,7 +226,7 @@ export interface SceneView { w: number; h: number; cam: Camera; guides?: boolean
         return;
       }
       var upper = P['eyes.upper'] || 0, o = K.clamp(e.o, 0, 1) * (1 - upper * 0.5), tilt = C['eyes.tilt.' + e.s]!, sq = C['eyes.squint.' + e.s]!;
-      var outline = superEllipse(e.cu, e.cv, e.ew, e.eh, exps, 40);
+      var outline = shapeEye(superEllipse(e.cu, e.cv, e.ew, e.eh, exps, 40), e);
       var lid = function (u: number) { return e.cv + e.eh * (1 - 2 * (1 - o)) - tilt * e.dirIn * ((u - e.cu) / e.ew) * e.eh * 0.55 - abs(tilt) * e.eh * 0.15; };
       var low = function (u: number) { var x = (u - e.cu) / e.ew; return e.cv - e.eh + sq * e.eh * 1.1 * (1 - 0.3 * x * x); };
       var clipped = outline.map(function (q): Pt { return [q[0], K.clamp(q[1], low(q[0]), max(low(q[0]), lid(q[0])))]; });
@@ -217,13 +237,17 @@ export interface SceneView { w: number; h: number; cam: Camera; guides?: boolean
         return;
       }
       var white = faceLoop(clipped);
-      parts.push({ role: 'eye', fill: 'eyeWhite', pts: white, edge: true, lw: 0.9 });
+      // eye kinds: 0 white, 1 dot (no white), 2 button (a big iris), 3 ring (outline only)
+      if (eyeKind !== 1) parts.push({ role: 'eye', fill: eyeKind === 3 ? undefined : 'eyeWhite', pts: white, edge: true, lw: eyeKind === 3 ? 1.3 : 0.9 });
       // pupil
-      var pr = P['eyes.pupil']! * min(e.ew, e.eh) * 0.62, lx = C['eyes.lookX']!, ly = C['eyes.lookY']!;
-      var pu = e.cu + lx * e.ew * 0.45, pv = e.cv - e.eh * 0.05 + ly * e.eh * 0.4;
+      var pr = P['eyes.pupil']! * min(e.ew, e.eh) * (eyeKind === 2 ? 0.9 : eyeKind === 1 ? 0.75 : eyeKind === 3 ? 0.34 : 0.62), lx = C['eyes.lookX']!, ly = C['eyes.lookY']!;
+      var pu = e.cu + lx * e.ew * (eyeKind === 1 ? 0.3 : 0.45), pv = e.cv - e.eh * 0.05 + ly * e.eh * 0.4;
+      var pclip = eyeKind === 1 ? undefined : white, iris = P['eyes.iris'] || 0;
+      if (iris > 0.02 && eyeKind !== 1) parts.push({ role: 'iris', fill: 'pupil', alpha: 0.4, pts: faceLoop(superEllipse(pu, pv, pr * (1 + iris), pr * 1.08 * (1 + iris), exps, 24)), clip: pclip, stroke: false });
       var pupil = faceLoop(superEllipse(pu, pv, pr, pr * 1.08, exps, 24));
-      parts.push({ role: 'pupil', fill: 'pupil', pts: pupil, clip: white, stroke: false });
-      parts.push({ role: 'glint', fill: 'glint', pts: faceLoop(superEllipse(pu + pr * 0.35, pv + pr * 0.4, pr * 0.28, pr * 0.28, 2, 10)), clip: white, stroke: false });
+      parts.push({ role: 'pupil', fill: 'pupil', pts: pupil, clip: pclip, stroke: false });
+      parts.push({ role: 'glint', fill: 'glint', pts: faceLoop(superEllipse(pu + pr * 0.35, pv + pr * 0.4, pr * 0.28, pr * 0.28, 2, 10)), clip: pclip, stroke: false });
+      if (eyeKind === 1) return;
       // heavy upper lid: the top half of the clipped outline
       var top: Pt[] = [], mid = K.bbox(clipped).cy;
       for (var j = 0; j < clipped.length; j++) if (clipped[j]![1] >= mid - 1e-6) top.push(clipped[j]!);
@@ -252,6 +276,16 @@ export interface SceneView { w: number; h: number; cam: Camera; guides?: boolean
           var w = th * (1 + tp * (0.6 - s));
           topE.push([u, v + w * (0.4 + 0.6 * sin(PI * (0.15 + s * 0.7)))]); botE.push([u, v - w * (0.4 + 0.6 * sin(PI * (0.15 + s * 0.7)))]);
         }
+        if (browKind === 3) return;
+        if (browKind === 1) {           // a thin line along the middle of the brow
+          parts.push({ role: 'brow', pts: faceLoop(topE.map(function (q, i): Pt { return [q[0], (q[1] + botE[i]![1]) / 2]; })), line: true, lw: 1.6 });
+          return;
+        }
+        if (browKind === 2) {           // a solid bar: even thickness, square ends
+          var mids = topE.map(function (q, i): Pt { return [q[0], (q[1] + botE[i]![1]) / 2]; });
+          parts.push({ role: 'brow', fill: 'brow', pts: faceLoop(mids.map(function (q): Pt { return [q[0], q[1] + th * 1.1]; }).concat(mids.map(function (q): Pt { return [q[0], q[1] - th * 1.1]; }).reverse())), edge: true, lw: 0.5 });
+          return;
+        }
         parts.push({ role: 'brow', fill: 'brow', pts: faceLoop(topE.concat(botE.reverse())), edge: true, lw: 0.5 });
       });
     }
@@ -260,7 +294,8 @@ export interface SceneView { w: number; h: number; cam: Camera; guides?: boolean
       var mv = (splitV != null ? splitV : eyeV - 0.34 * Hh) + (P['mouth.y'] || 0) * Hh * 0.5;
       var mw = P['mouth.width']! * (W - 2 * bev) * 0.5 * wide * (1 - rnd * 0.55) * tscale(mv), mu = cheat * 0.8;
       var oh = open * 0.12 * size * (1 + rnd * 0.4);
-      var corner = function (x: number) { return smile * 0.05 * x * x + skew * 0.035 * x - abs(smile) * 0.01; };
+      var tip = P['mouth.tip'] || 0;
+      var corner = function (x: number) { return smile * 0.05 * x * x + skew * 0.035 * x - abs(smile) * 0.01 + tip * 0.03 * x * x; };
       var halfW = (W / 2) * tscale(mv) - bev * 0.5;
       if (oh < 0.012) {
         // shut: the mouth is just a bend in the door line
@@ -269,6 +304,7 @@ export interface SceneView { w: number; h: number; cam: Camera; guides?: boolean
         for (k = 0; k <= 16; k++) { var x = -1 + k / 8; ln.push([mu + x * mw, mv + corner(x) - (rnd * 0.01 * (1 - x * x))]); }
         if (splitV != null) ln.push([halfW, mv]);
         parts.push({ role: 'mouth-line', pts: faceLoop(ln), line: true, lw: 1.2 });
+        lipRoll(mv + corner(0), 0);
         return;
       }
       var topL: Pt[] = [], botL: Pt[] = [], n = 18;
@@ -283,14 +319,41 @@ export interface SceneView { w: number; h: number; cam: Camera; guides?: boolean
         parts.push({ role: 'split', pts: faceLoop([[mu + mw * 1.0, mv + corner(1)], [halfW, mv]]), line: true, lw: 1.0 });
       }
       parts.push({ role: 'mouth', fill: 'mouth', pts: mouth, edge: true, lw: 1.2 });
+      lipRoll(botL[n / 2]![1], oh);
       if (C['mouth.teeth']! * (P['mouth.teeth'] == null ? 1 : P['mouth.teeth']) > 0.3 && open > 0.15) {
-        var tb = min(oh * 0.35, 0.045), teeth = topL.concat(topL.map(function (q): Pt { return [q[0], q[1] - tb]; }).reverse());
-        parts.push({ role: 'teeth', fill: 'teeth', pts: faceLoop(teeth), clip: mouth, edge: true, lw: 0.5 });
+        var tb = min(oh * 0.35, 0.045);
+        if (teethKind === 2) {           // two fangs hanging from the top lip
+          [-0.45, 0.45].forEach(function (x) {
+            var i = Math.round((x + 1) / 2 * n), q = topL[i]!, fw = mw * 0.12;
+            parts.push({ role: 'teeth', fill: 'teeth', pts: faceLoop([[q[0] - fw, q[1] + 0.01], [q[0] + fw, q[1] + 0.01], [q[0], q[1] - tb * 1.8]]), clip: mouth, edge: true, lw: 0.5 });
+          });
+        } else {
+          var band = function (from: number, to: number) {
+            var seg = topL.slice(from, to + 1);
+            parts.push({ role: 'teeth', fill: 'teeth', pts: faceLoop(seg.concat(seg.map(function (q): Pt { return [q[0], q[1] - tb]; }).reverse())), clip: mouth, edge: true, lw: 0.5 });
+          };
+          if (teethKind === 3) { band(0, Math.floor(n / 2) - 1); band(Math.ceil(n / 2) + 1, n); }   // a gap at the front
+          else band(0, n);
+          if (teethKind === 1) for (var ti = 2; ti < n - 1; ti += 3) {   // separate teeth
+            var tq = topL[ti]!;
+            parts.push({ role: 'teeth-line', pts: faceLoop([[tq[0], tq[1] + 0.005], [tq[0], tq[1] - tb]]), line: true, lw: 0.6, clip: mouth });
+          }
+        }
       }
       if (C['mouth.tongue']! > 0.1) {
         var tg = superEllipse(mu + mw * 0.1, botL[n / 2]![1] + oh * 0.2, mw * 0.55, oh * 0.4 * C['mouth.tongue']! + 0.01, 2, 20);
         parts.push({ role: 'tongue', fill: 'tongue', pts: faceLoop(tg), clip: mouth, edge: true, lw: 0.5 });
       }
+    }
+    /** A curl on top of the head (body.curl): a little spring of hair. */
+    function curlPart(): void {
+      var len = P['body.curl'] || 0; if (len < 0.02) return;
+      var root = proj(body3(0, Hh / 2, 0)), pts: Pt[] = [], turns = 0.8 + len * 1.6, N = 28;
+      for (var k = 0; k <= N; k++) {
+        var f = k / N, a = f * turns * PI * 2, r = (0.02 + 0.07 * f) * len * cam.unit * root[3];
+        pts.push([root[0] + sin(a) * r, root[1] - (0.04 + 0.16 * len * f) * cam.unit * root[3] - (1 - cos(a)) * r * 0.6]);
+      }
+      parts.push({ role: 'curl', pts: pts, line: true, lw: 1.5 });
     }
     function heart(cu: number, cv: number, r: number): Pt[] {
       var pts: Pt[] = []; for (var k = 0; k < 30; k++) { var a = k / 30 * PI * 2, x = 16 * Math.pow(sin(a), 3), y = 13 * cos(a) - 5 * cos(2 * a) - 2 * cos(3 * a) - cos(4 * a); pts.push([cu + x / 17 * r, cv + y / 17 * r]); }

@@ -51,7 +51,7 @@ function el<T extends keyof HTMLElementTagNameMap>(tag: T, cls?: string | null, 
 }
 
 const STYLE_ORDER = allSkins.map((s) => s.name);
-const CAST_ORDER = ['max', 'child', 'girl', 'boss', 'clerk', 'teen', 'professor', 'oldman'];
+const CAST_ORDER = ['max', 'child', 'girl', 'boss', 'clerk', 'teen', 'professor', 'oldman', 'grandma'];
 const SECTION_LABEL: Record<string, string> = { attitudes: 'Attitudes', feelings: 'Feelings', eyes: 'Eyes', mouth: 'Mouth and tongues', hands: 'Hands', body: 'Body' };
 const FACES = ['feel-happy', 'feel-furious', 'feel-sad', 'feel-surprised', 'feel-terrified', 'feel-plotting', 'feel-crying', 'feel-laughing', 'feel-bored', 'feel-flirting', 'feel-sulking', 'feel-proud', 'feel-embarrassed', 'feel-excited', 'eyes-suspicious', 'eyes-sleepy', 'mouth-smirk', 'mouth-oo'];
 const FACE_STYLES = ['pencil', 'sketch', 'felttip', 'ballpoint', 'riso', 'inkbleed', 'print', 'manga', 'gigposter', 'gloss'];
@@ -350,7 +350,11 @@ function buildPanel(): void {
     const groups: Record<string, DesignRow[]> = {}; DESIGN.forEach((r) => { (groups[r[1]] = groups[r[1]] || []).push(r); });
     Object.keys(groups).forEach((g) => {
       body.appendChild(el('h4', null, g));
-      groups[g]!.forEach((r) => { dial(body, 'dial:' + r[0], r[2], r[4], r[5], d[r[0]]!, r[3], (v) => { ST.actor.set(r[0], v); bump(); src('set', r[0]); }, r[0]); });
+      groups[g]!.forEach((r) => {
+        const opts = r[7];
+        if (opts) choice(body, 'dial:' + r[0], r[2], opts, opts[Math.round(d[r[0]] || 0)]!, (v) => { ST.actor.set(r[0], opts.indexOf(v)); bump(); src('set', r[0]); }, r[0]);
+        else dial(body, 'dial:' + r[0], r[2], r[4], r[5], d[r[0]]!, r[3], (v) => { ST.actor.set(r[0], v); bump(); src('set', r[0]); }, r[0]);
+      });
     });
   } else if (ST.panel === 'Tune') {
     const sk = skin(ST.style); body.appendChild(el('h4', null, sk.label)); body.appendChild(el('p', 'note', sk.about));
@@ -387,8 +391,8 @@ function dial(host: HTMLElement, k: string, label: string, min: number, max: num
   r.oninput = () => { o.textContent = (+r.value).toFixed(2); onInput(+r.value); };
   row.appendChild(el('span', null, label)); row.appendChild(r); row.appendChild(o); host.appendChild(row);
 }
-function choice(host: HTMLElement, k: string, label: string, options: string[], value: string, onChange: (v: string) => void): void {
-  const row = el('label', 'dial'), sel = el('select');
+function choice(host: HTMLElement, k: string, label: string, options: string[], value: string, onChange: (v: string) => void, key?: string): void {
+  const row = el('label', 'dial'), sel = el('select'); if (key) sel.dataset.key = key;
   options.forEach((o) => { const opt = el('option', null, o); opt.value = o; sel.appendChild(opt); });
   sel.value = value; sel.onchange = () => onChange(sel.value); row.dataset.k = k;
   row.appendChild(el('span', null, label)); row.appendChild(sel); row.appendChild(el('output')); host.appendChild(row);
@@ -411,6 +415,10 @@ function markPanel(kind: string, v: string): void {
 }
 function syncDials(): void {
   if (ST.panel !== 'Design') return;
+  $('#panelBody').querySelectorAll<HTMLSelectElement>('select[data-key]').forEach((sel) => {
+    if (document.activeElement === sel) return; const v = ST.actor.design[sel.dataset.key!]; if (v == null) return;
+    const want = sel.options[Math.round(v)]; if (want && sel.value !== want.value) sel.value = want.value;
+  });
   $('#panelBody').querySelectorAll<HTMLInputElement>('input[data-key]').forEach((r) => {
     if (document.activeElement === r) return; const v = ST.actor.design[r.dataset.key!]; if (v == null) return;
     r.value = String(v); (r.nextSibling as HTMLElement).textContent = (+v).toFixed(2);

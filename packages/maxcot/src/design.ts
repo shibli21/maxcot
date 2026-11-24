@@ -1,8 +1,8 @@
 // design.ts
 import type { DesignValues } from './types.js';
 
-/** [key, group, label, help, min, max, default] */
-export type DesignRow = [string, string, string, string, number, number, number];
+/** [key, group, label, help, min, max, default, options?]. With options, the value is an index into them. */
+export type DesignRow = [string, string, string, string, number, number, number, string[]?];
 /** How an actor moves when nobody is telling it what to do. */
 export type IdleHabit = 'none' | 'still' | 'fidget' | 'bouncy' | 'sway';
 export type GazeHabit = 'steady' | 'away' | 'darting' | 'us';
@@ -32,13 +32,20 @@ export interface CastMember { key: string; label: string; about: string; values:
     ['body.split', 'body', 'Door line', 'Height of the door split (it is also the mouth line). 0 = none.', 0, 0.8, 0.43],
     ['body.slant', 'body', 'Slant', 'Leans the top over the foot.', -0.3, 0.3, 0.0],
     ['body.size', 'body', 'Size', 'The whole figure.', 0.5, 1.4, 1.0],
+    ['body.curl', 'body', 'Curl length', 'A curl on top of the head. 0 = none.', 0, 1, 0],
 
+    ['eyes.style', 'eyes', 'Kind', 'White with a pupil, a dot, a button (big iris) or a ring.', 0, 3, 0, ['white', 'dot', 'button', 'ring']],
     ['eyes.size', 'eyes', 'Size', 'Half the width of one eye.', 0.05, 0.3, 0.15],
     ['eyes.aspect', 'eyes', 'Tall', 'Height over width.', 0.5, 2.0, 1.15],
     ['eyes.spacing', 'eyes', 'Apart', 'How far apart, as a share of the width.', 0.15, 0.85, 0.42],
     ['eyes.height', 'eyes', 'Height', 'How high on the face (0 = top).', 0.15, 0.7, 0.4],
     ['eyes.shape', 'eyes', 'Shape', '0 round, 1 square.', 0, 1, 0.55],
     ['eyes.pupil', 'eyes', 'Pupil', 'Pupil size.', 0.2, 0.95, 0.53],
+    ['eyes.iris', 'eyes', 'Iris', 'A ring of iris around the pupil. 0 = none.', 0, 1, 0],
+    ['eyes.bow', 'eyes', 'Bowed sides', 'The sides bulge out (or pinch in).', -1, 1, 0],
+    ['eyes.flat', 'eyes', 'Flat top', 'Over the top half: 0 round, 1 flat.', 0, 1, 0],
+    ['eyes.taper', 'eyes', 'Eye taper', 'Narrower at the bottom (or the top, below 0).', -1, 1, 0],
+    ['eyes.slide', 'eyes', 'Face slide', 'Slides the whole face sideways across the front.', -1, 1, 0],
     ['eyes.upper', 'eyes', 'Lid', 'How low the upper lid rests.', 0, 0.8, 0.3],
     ['eyes.lash', 'eyes', 'Lashes', 'Lash length.', 0, 1, 0],
     ['eyes.bag', 'eyes', 'Lower lid line', 'A line under each eye.', 0, 1, 0],
@@ -49,10 +56,14 @@ export interface CastMember { key: string; label: string; about: string; values:
     ['brows.gap', 'brows', 'Gap', 'Space between brow and eye.', 0, 0.3, 0.08],
     ['brows.arch', 'brows', 'Arch', 'Arched or flat.', -1, 1, 0.25],
     ['brows.taper', 'brows', 'Taper', 'Heavier at the inner end.', 0, 1, 0.3],
+    ['brows.style', 'brows', 'Kind', 'Tapered strokes, thin lines, solid bars or none.', 0, 3, 0, ['tapered', 'line', 'bar', 'none']],
 
     ['mouth.width', 'mouth', 'Width', 'Mouth width, as a share of the face.', 0.1, 0.8, 0.42],
     ['mouth.y', 'mouth', 'Height', 'Offset from the door line.', -0.3, 0.3, 0.0],
     ['mouth.teeth', 'mouth', 'Teeth', 'Show the teeth when open.', 0, 1, 1],
+    ['teeth.style', 'mouth', 'Teeth kind', 'One band, separate teeth, two fangs or a gap at the front.', 0, 3, 0, ['band', 'separate', 'fangs', 'gap']],
+    ['mouth.tip', 'mouth', 'Tip', 'Corners turned up (a natural smile) or down (a natural frown).', -1, 1, 0],
+    ['mouth.roll', 'mouth', 'Lip roll', 'A rolled lower lip under the mouth.', 0, 1, 0],
 
     ['hands.size', 'hands', 'Size', 'Mitt size.', 0.1, 0.36, 0.2],
     ['hands.spread', 'hands', 'Spread', 'How far from the body they float.', 0.0, 0.8, 0.3],
@@ -124,6 +135,11 @@ export interface CastMember { key: string; label: string; about: string; values:
     professor: { weight: 0.7, idle: 'still', gaze: 'steady', rest: 'counting' }
   };
   for (const k in MANNERS) Object.assign(CAST[k]!.manner, MANNERS[k]);
+  cast('grandma', 'Grandmother', 'A bun on top, round button eyes, a gap in her smile.', {
+    'body.w': 0.95, 'body.h': 0.92, 'body.d': 0.55, 'body.rt': 0.38, 'body.rb': 0.2, 'body.taper': -0.08, 'body.curl': 0.7,
+    'eyes.style': 2, 'eyes.size': 0.12, 'eyes.aspect': 1, 'eyes.shape': 0, 'eyes.upper': 0.35, 'eyes.bag': 1, 'eyes.bow': 0.3,
+    'brows.style': 1, 'brows.len': 0.2, 'brows.arch': 0.8, 'mouth.tip': 0.4, 'mouth.roll': 0.5, 'teeth.style': 3, 'hands.size': 0.17
+  }, { weight: 0.7, idle: 'sway', gaze: 'us', rest: 'at-ease' });
   CAST.kid = CAST.child!;
   /** An actor's manner (a copy you can change). */
   function mannerOf(who?: string): Manner { return Object.assign({}, ((who && CAST[who]) || CAST.max!).manner); }
