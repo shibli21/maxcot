@@ -33,12 +33,16 @@ export default class Mixer {
   get sounding(): boolean { return this.nodes.length > 0; }
   /** Forget the log (a different score). */
   clear(): void { this.log.clear(); this.hush(); }
-  /** Mix the logged cues onto a rendered beat and return the whole soundtrack as a base64 WAV. */
-  render(beat: AudioBuffer): string {
+  /** The logged cues mixed onto a rendered beat, one array per channel. */
+  mixed(beat: AudioBuffer): Float32Array[] {
     const rate = beat.sampleRate, chans: Float32Array[] = [];
     for (let c = 0; c < beat.numberOfChannels; c++) chans.push(Float32Array.from(beat.getChannelData(c)));
     this.log.forEach((cue) => { chans.forEach((ch) => mixInto(ch, rate, cue)); });
-    const bytes = wav(chans, rate); let bin = '';
+    return chans;
+  }
+  /** Mix the logged cues onto a rendered beat and return the whole soundtrack as a base64 WAV. */
+  render(beat: AudioBuffer): string {
+    const bytes = wav(this.mixed(beat), beat.sampleRate); let bin = '';
     for (let j = 0; j < bytes.length; j += 0x8000) bin += String.fromCharCode.apply(null, Array.from(bytes.subarray(j, j + 0x8000)));
     return btoa(bin);
   }

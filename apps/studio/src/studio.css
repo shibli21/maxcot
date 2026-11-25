@@ -157,3 +157,13 @@ button { font: inherit; }
 .tl-picker .tl-btn.snd, .tl-picker .snd-add, .tl-picker .snd-del { align-self: center; white-space: nowrap; }
 .tl-picker .snd-add { font-weight: 600; }
 .tl-picker .snd-del { color: #b3261e; border-color: #e3b5b1; }
+#exportDlg { position: fixed; inset: 0; background: rgba(20,20,20,0.45); display: flex; align-items: center; justify-content: center; z-index: 50; }
+#exportDlg .box { background: #fbfaf6; border: 1px solid #cfcdc4; padding: 18px 20px; width: min(420px, calc(100vw - 32px)); box-shadow: 0 12px 40px rgba(0,0,0,0.25); }
+#exportDlg h3 { margin: 0 0 4px; font-size: 16px; }
+#exportDlg .xrow { display: grid; grid-template-columns: 130px 1fr; align-items: center; gap: 8px; margin: 8px 0; font-size: 13px; }
+#exportDlg .xrow input[type=number], #exportDlg .xrow select { font: inherit; padding: 3px 6px; border: 1px solid #d5d3cb; background: #fff; }
+#exportDlg .xrow input[type=checkbox] { justify-self: start; }
+#exportDlg .xbtns { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
+#exportDlg .xbtns button { border: 1px solid #cfcdc4; background: #fff; padding: 6px 14px; cursor: pointer; }
+#exportDlg .xbtns .go { background: #111; color: #fff; border-color: #111; }
+#exportDlg .xbtns .go:disabled { opacity: 0.5; cursor: default; }

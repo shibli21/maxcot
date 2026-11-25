@@ -175,7 +175,13 @@ bun run build:lib   # the library, to packages/maxcot/dist
 
 ## Rendering a video
 
-`?capture` turns off the studio's real-time clock so it can be stepped one frame at a
+**In the browser:** press **Export** in the studio for an MP4 (with the soundtrack), an animated
+GIF or a PNG still. It is made in the page with WebCodecs, stepping the studio one exact frame at a
+time, so nothing is dropped and nothing is uploaded. Pick the range, shape (16:9, 9:16, 1:1, 4:5),
+size (up to 1440p) and frame rate. MP4 needs a browser with WebCodecs (Chrome, Edge, recent Safari);
+GIF and PNG work everywhere.
+
+**From the command line:** `?capture` turns off the studio's real-time clock so it can be stepped one frame at a
 time. The recorder drives it in headless Chrome and pipes the frames into ffmpeg. The studio
 logs every line, effect and film sound as it plays, so the soundtrack (the beat rendered
 offline with all of those mixed on top) is muxed in afterwards:

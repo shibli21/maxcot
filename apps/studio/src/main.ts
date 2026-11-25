@@ -11,6 +11,7 @@ import { Voice, babble, lipTrack, lipsAt, pitchOf, type Lips } from 'maxcot/voic
 import hello from './hello';
 import Beat from './beat';
 import Mixer from './mixer';
+import { canExport, exportVideo, type ExportFormat, type ExportHost, type ExportOptions } from './exporter';
 import { decodeShare, encodeShare, fileName, makeProject, readProject, type Project } from './project';
 import './studio.css';
 // The code panes show the real source files.
@@ -52,7 +53,9 @@ type Command = (v: unknown, ev: ScheduledEvent, ctx: CommandContext) => void;
 
 const SKINS = skinsByName();
 const skin = (name: string): Skin => SKINS[name] || SKINS.pencil!;
-const DPR = Math.min(window.devicePixelRatio || 1, 1.5);
+const BASE_DPR = Math.min(window.devicePixelRatio || 1, 1.5);
+/** Canvas pixels per CSS pixel. An export raises it for a sharper picture. */
+let DPR = BASE_DPR;
 const CAPTURE = /[?&]capture(=|&|$)/.test(location.search), SMOOTH: ScrollBehavior = CAPTURE ? 'auto' : 'smooth';
 const $ = <T extends HTMLElement = HTMLElement>(s: string): T => document.querySelector(s) as T;
 function el<T extends keyof HTMLElementTagNameMap>(tag: T, cls?: string | null, txt?: string): HTMLElementTagNameMap[T] {
@@ -724,6 +727,7 @@ function initEditor(): void {
   $<HTMLInputElement>('#fileOpen').onchange = (e) => { const inp = e.target as HTMLInputElement, f = inp.files && inp.files[0]; if (f) void openFile(f); inp.value = ''; };
   $('#bSave').onclick = saveProject;
   $('#bShare').onclick = () => { void shareProject(); };
+  $('#bExport').onclick = openExport;
   $<HTMLInputElement>('#voiceFile').onchange = (e) => { const inp = e.target as HTMLInputElement, f = inp.files && inp.files[0]; if (f) void startVoice('file', f); inp.value = ''; };
   // every .score file in scores/ is a demo
   const demos = import.meta.glob('./scores/*.score', { query: '?raw', import: 'default', eager: true }) as Record<string, string>;
@@ -829,7 +833,7 @@ function wire(): void {
 // ── the frame loop ───────────────────────────────────────────────────────
 // ?capture renders deterministically: no clock of its own, Studio.step(dt) advances it.
 let lastNow = performance.now(), lastFilm = 0, lastCams = 0, lastCard = 0, lastDial = 0;
-function loop(now: number): void { step(Math.min(0.1, (now - lastNow) / 1000)); lastNow = now; requestAnimationFrame(loop); }
+function loop(now: number): void { if (!exporting) step(Math.min(0.1, (now - lastNow) / 1000)); lastNow = now; requestAnimationFrame(loop); }
 function step(dt: number): void {
   ST.clock += dt;
   try {
@@ -861,6 +865,95 @@ function step(dt: number): void {
   } catch (e) { console.error(e); }
 }
 
+// ── export: MP4, GIF and stills, made in the browser one exact frame at a time ──
+let exporting = false;
+/** Draw what the view shows into `ctx`: the film or the end card on their own, otherwise every canvas in the view where it sits. */
+function composeView(ctx: CanvasRenderingContext2D, W: number, H: number): void {
+  const area = $('#viewArea'), A = area.getBoundingClientRect();
+  ctx.fillStyle = getComputedStyle(area).backgroundColor || '#f3f2ec'; ctx.fillRect(0, 0, W, H);
+  const one = ST.mode === 'film' ? $<HTMLCanvasElement>('#filmCanvas') : ST.mode === 'card' ? $<HTMLCanvasElement>('#cardCanvas') : null;
+  if (one) {
+    if (ST.mode === 'film') { ctx.fillStyle = '#111'; ctx.fillRect(0, 0, W, H); }
+    const k = Math.min(W / one.width, H / one.height), w = one.width * k, h = one.height * k;
+    ctx.drawImage(one, (W - w) / 2, (H - h) / 2, w, h); return;
+  }
+  const kx = W / A.width, ky = H / A.height;
+  $('#v-' + VIEW[ST.mode]).querySelectorAll('canvas').forEach((c) => {
+    const r = c.getBoundingClientRect(); if (!r.width || !r.height || r.right < A.left || r.left > A.right || r.bottom < A.top || r.top > A.bottom) return;
+    ctx.drawImage(c, (r.left - A.left) * kx, (r.top - A.top) * ky, r.width * kx, r.height * ky);
+  });
+}
+function exportHost(): ExportHost {
+  const was = { t: bts.songT, playing: bts.playing, sound: beat.on, style: null as string | null };
+  return {
+    begin(w, h) {
+      exporting = true; mixer.hush(); mixer.on = false; beat.stop(); bts.setClock(null);
+      // lay the view out at the picture's shape (same height on screen), then draw it at the picture's resolution
+      const area = $('#viewArea'), ch = Math.max(120, area.clientHeight);
+      was.style = area.getAttribute('style'); area.style.flex = 'none'; area.style.height = ch + 'px'; area.style.width = Math.round(ch * w / h) + 'px';
+      DPR = K.clamp(h / ch, 0.5, 4); tilesSig = ''; layout(); stage.cut();   // reframe for the new canvas size
+    },
+    seek(t) { bts.seek(t); bts.play(); step(0); },
+    frame(dt, ctx, w, h) { step(dt); composeView(ctx, w, h); },
+    async soundtrack(from, to) {
+      const buf = await Beat.render(bts.bpm, to), chans = mixer.mixed(buf), a = Math.round(from * buf.sampleRate);
+      return chans.map((c) => c.slice(a, Math.round(to * buf.sampleRate)));
+    },
+    end() {
+      const area = $('#viewArea'); if (was.style == null) area.removeAttribute('style'); else area.setAttribute('style', was.style);
+      exporting = false; DPR = BASE_DPR; tilesSig = ''; layout(); stage.cut();
+      bts.pause(); setSound(was.sound); bts.seek(was.t); if (was.playing) bts.play();
+    }
+  };
+}
+/** Export with defaults filled in. Resolves with the file and what went into it. */
+function runExport(o: Partial<ExportOptions> & { format: ExportFormat }) {
+  return exportVideo(exportHost(), Object.assign({ from: 0, to: bts.total, height: 720, aspect: 16 / 9, fps: 30, sound: beat.on }, o));
+}
+function exportName(ext: string): string { return fileName(currentProject()).replace(/\.maxcot\.json$/, '') + '.' + ext; }
+function download(blob: Blob, name: string): void {
+  const a = el('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+function openExport(): void {
+  if ($('#exportDlg')) return;
+  bts.pause();
+  const can = canExport(), dlg = el('div'), box = el('div', 'box'); dlg.id = 'exportDlg';
+  box.appendChild(el('h3', null, 'Export'));
+  box.appendChild(el('p', 'note', 'Rendered here in your browser one frame at a time, so nothing is dropped and nothing is uploaded.'));
+  const row = (label: string, input: HTMLElement) => { const l = el('label', 'xrow'); l.appendChild(el('span', null, label)); l.appendChild(input); box.appendChild(l); return input; };
+  const sel = (opts: Array<[string, string, boolean?]>, value: string) => { const s = el('select'); opts.forEach(([v, t, off]) => { const o = el('option', null, t); o.value = v; o.disabled = !!off; s.appendChild(o); }); s.value = value; return s; };
+  const fmt = row('Format', sel([['mp4', can.mp4 ? 'MP4 video' : 'MP4 video (this browser cannot encode video)', !can.mp4], ['gif', 'Animated GIF'], ['png', 'PNG still of this frame']], can.mp4 ? 'mp4' : 'gif')) as HTMLSelectElement;
+  const num = (v: number, step = 0.1) => { const i = el('input'); i.type = 'number'; i.min = '0'; i.max = String(bts.total.toFixed(1)); i.step = String(step); i.value = String(+v.toFixed(1)); return i; };
+  const from = row('From (seconds)', num(0)) as HTMLInputElement, to = row('To (seconds)', num(bts.total)) as HTMLInputElement;
+  const shape = row('Shape', sel([['1.7778', 'Wide 16:9'], ['0.5625', 'Tall 9:16'], ['1', 'Square 1:1'], ['0.8', 'Portrait 4:5']], '1.7778')) as HTMLSelectElement;
+  const size = row('Size', sel([['480', '480p'], ['720', '720p'], ['1080', '1080p'], ['1440', '1440p']], '720')) as HTMLSelectElement;
+  const fps = row('Frames a second', sel([['24', '24'], ['30', '30'], ['60', '60']], '30')) as HTMLSelectElement;
+  const snd = el('input'); snd.type = 'checkbox'; snd.checked = beat.on; row('Sound', snd);
+  const bar = el('div', 'meter'); bar.appendChild(el('i')); box.appendChild(bar);
+  const status = el('p', 'note', ''); box.appendChild(status);
+  const go = el('button', 'go', 'Export'), cancel = el('button', null, 'Close'), btns = el('div', 'xbtns'); btns.appendChild(cancel); btns.appendChild(go); box.appendChild(btns);
+  const sync = () => { const still = fmt.value === 'png'; [from, to, fps].forEach((i) => { (i.parentElement as HTMLElement).style.display = still ? 'none' : ''; }); (snd.parentElement as HTMLElement).style.display = fmt.value === 'mp4' ? '' : 'none'; };
+  fmt.onchange = sync; sync();
+  let ctl: AbortController | null = null;
+  cancel.onclick = () => { if (ctl) ctl.abort(); else dlg.remove(); };
+  go.onclick = async () => {
+    const f = fmt.value as ExportFormat, a = K.clamp(+from.value || 0, 0, bts.total), b = K.clamp(+to.value || bts.total, a + 0.1, bts.total);
+    ctl = new AbortController(); go.disabled = true; cancel.textContent = 'Cancel'; status.textContent = 'Rendering…';
+    const fill = bar.firstChild as HTMLElement;
+    try {
+      const r = await runExport({ format: f, from: a, to: b, height: +size.value, aspect: +shape.value, fps: +fps.value, sound: snd.checked, signal: ctl.signal, onProgress: (p) => { fill.style.width = Math.round(p * 100) + '%'; } });
+      download(r.blob, exportName(f));
+      status.textContent = 'Done: ' + r.width + '×' + r.height + (r.frames > 1 ? ', ' + r.frames + ' frames' : '') + (r.audio ? ', with sound' : '') + ' (' + (r.blob.size / 1048576).toFixed(1) + ' MB).';
+      toast('Exported ' + exportName(f));
+    } catch (e) {
+      status.textContent = (e as Error).name === 'AbortError' ? 'Cancelled.' : 'Export failed: ' + (e as Error).message;
+    }
+    ctl = null; go.disabled = false; cancel.textContent = 'Close';
+  };
+  dlg.appendChild(box); document.body.appendChild(dlg);
+}
+
 // ── boot ─────────────────────────────────────────────────────────────────
 const tour = parseScore(tourScore);
 if (!tour.ok) throw new Error('tour.score line ' + tour.error.line + ': ' + tour.error.message);
@@ -883,7 +976,7 @@ if (!CAPTURE) requestAnimationFrame(loop);
 
 declare global { interface Window { Studio: unknown } }
 window.Studio = {
-  exec, step, openPanel, setMode, conductor: bts, stage, voice,
+  exec, step, openPanel, setMode, conductor: bts, stage, voice, exportVideo: runExport, openExport,
   renderBeatWav: (sec: number) => Beat.render(bts.bpm, sec).then(Beat.wav64),
   /** The beat plus every logged cue (lines, effects, the film's sound track) as one WAV. */
   renderSoundWav: (sec: number) => Beat.render(bts.bpm, sec).then((b) => mixer.render(b)), mixer,
