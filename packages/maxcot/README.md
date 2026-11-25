@@ -1,6 +1,6 @@
 # maxcot
 
-A character animation engine drawn entirely in code: one rig, 8 actors, 26 visual
+A character animation engine drawn entirely in code: one rig, 8 actors, 42 visual
 skins, a film player and a bars-and-beats sequencer. No images, no sprites. Every
 line, hatch and halftone dot is generated on a 2D canvas, in the browser or in Node.
 
@@ -13,7 +13,7 @@ Strict TypeScript, ES modules, zero runtime dependencies. Six entry points:
 | Import | What it gives you |
 |---|---|
 | `maxcot` | `createCharacter`, `createStage`, `Actor`, `render`, `scene`, poses, the design table, the cast |
-| `maxcot/skins` | the 26 skins as plain objects, plus `allSkins` and `skinsByName` |
+| `maxcot/skins` | the 42 skins as plain objects, plus `allSkins` and `skinsByName` |
 | `maxcot/film` | `Player` (shots, beats, who/style tracks, cameras), a DOM timeline `Editor`, `card` |
 | `maxcot/score` | `createConductor`: sequence anything in bars and beats, with exact seeking |
 | `maxcot/voice` | lip-sync from sound: a live `Voice` (microphone or file), offline `lipTrack`, a `babble` test voice |
@@ -192,7 +192,7 @@ render(canvas.getContext('2d') as unknown as Ctx2D, 800, 600, boss.frame(1), { s
 writeFileSync('boss.png', canvas.toBuffer('image/png'));
 ```
 
-All 26 skins are tested this way with `@napi-rs/canvas`. In a Web Worker, OffscreenCanvas is used automatically.
+All 42 skins are tested this way with `@napi-rs/canvas`. In a Web Worker, OffscreenCanvas is used automatically.
 
 ## Writing a skin
 

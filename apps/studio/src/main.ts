@@ -21,6 +21,10 @@ import drawnSrc from '../../../packages/maxcot/src/skins/drawn.ts?raw';
 import printSrc from '../../../packages/maxcot/src/skins/print.ts?raw';
 import screensSrc from '../../../packages/maxcot/src/skins/screens.ts?raw';
 import glitchSrc from '../../../packages/maxcot/src/skins/glitch.ts?raw';
+import houseSrc from '../../../packages/maxcot/src/skins/house.ts?raw';
+import comicsSrc from '../../../packages/maxcot/src/skins/comics.ts?raw';
+import cartoonSrc from '../../../packages/maxcot/src/skins/cartoon.ts?raw';
+import pixelsSrc from '../../../packages/maxcot/src/skins/pixels.ts?raw';
 import filmSrc from '../../../packages/maxcot/src/film/film.ts?raw';
 import voiceSrc from '../../../packages/maxcot/src/voice/analyze.ts?raw';
 import sfxSrc from '../../../packages/maxcot/src/sound/sfx.ts?raw';
@@ -738,7 +742,8 @@ function initEditor(): void {
 }
 function lit(o: unknown): string[] { return JSON.stringify(o, null, 2).replace(/"([A-Za-z_$][\w$]*)":/g, '$1:').replace(/"((?:[^"\\]|\\.)*)"/g, "'$1'").split('\n'); }
 const LIB = 'packages/maxcot/src/';
-const SKIN_FILE: Record<string, [string, string]> = { drawn: ['drawn', drawnSrc], print: ['print', printSrc], screens: ['screens', screensSrc], signal: ['glitch', glitchSrc], time: ['glitch', glitchSrc] };
+const SKIN_FILE: Record<string, [string, string]> = { drawn: ['drawn', drawnSrc], print: ['print', printSrc], screens: ['screens', screensSrc], signal: ['glitch', glitchSrc], time: ['glitch', glitchSrc],
+  house: ['house', houseSrc], comics: ['comics', comicsSrc], cartoon: ['cartoon', cartoonSrc], pixels: ['pixels', pixelsSrc] };
 /** A whole source file, highlighted at the first line containing `needle`. */
 function fileAt(text: string, needle: string): { lines: string[]; hi: number } {
   const lines = text.split('\n'); let hi = lines.findIndex((l) => l.includes(needle)); if (hi < 0) hi = 0;

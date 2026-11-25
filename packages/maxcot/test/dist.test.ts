@@ -11,7 +11,7 @@ describe('dist', () => {
     const sound = await import('../dist/sound/index.js');
     expect(typeof core.createCharacter).toBe('function');
     expect(typeof core.Character).toBe('function');
-    expect(skins.allSkins).toHaveLength(26);
+    expect(skins.allSkins).toHaveLength(42);
     expect(typeof film.Player).toBe('function');
     expect(new score.Conductor({ bpm: 60 }).timeOf([2, 1])).toBe(4);
     expect(typeof voice.Voice).toBe('function');

@@ -16,7 +16,7 @@ describe('rendering in Node', () => {
       // something other than the background was drawn
       const px = c.getContext('2d').getImageData(0, 0, 160, 130).data;
       const colours = new Set<number>(); for (let i = 0; i < px.length; i += 16) colours.add((px[i]! << 16) | (px[i + 1]! << 8) | px[i + 2]!);
-      expect(colours.size).toBeGreaterThan(8);
+      expect(colours.size).toBeGreaterThan(skin.name === 'gameboy' ? 3 : 8);   // the handheld has four greens
     });
   }
 });

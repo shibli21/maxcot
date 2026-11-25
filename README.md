@@ -1,9 +1,9 @@
 # Maxcot
 
-**A character animation studio drawn entirely in code.** One rig, 26 visual skins, 8
+**A character animation studio drawn entirely in code.** One rig, 42 visual skins, 8
 actors and a film timeline, all driven by a score you write in bars and beats.
 
-**[▶ Open the live studio](https://shibli21.github.io/maxcot/)** · [all 26 skins](https://shibli21.github.io/maxcot/sheet.html?mode=skins) · [smallest example](https://shibli21.github.io/maxcot/example.html)
+**[▶ Open the live studio](https://shibli21.github.io/maxcot/)** · [all 42 skins](https://shibli21.github.io/maxcot/sheet.html?mode=skins) · [smallest example](https://shibli21.github.io/maxcot/example.html)
 
 ![Maxcot](media/social-preview.png)
 
@@ -26,7 +26,7 @@ bun install
 bun run dev
 ```
 
-- **Play the score** plays the showcase: poses, all 26 skins, every actor, the design dials, the film editor, multicam and four aspect ratios.
+- **Play the score** plays the showcase: poses, all 42 skins, every actor, the design dials, the film editor, multicam and four aspect ratios.
 - **Open the studio** gives you the panels for free play: Styles, Tune, Poses, Design and Motion.
 - Space plays and pauses, ← and → jump a bar, and the scrubber seeks anywhere. `g` toggles construction lines and Esc closes the panel.
 - While it plays, the left side shows the score line that's running and the real source of whatever it touches.
@@ -143,7 +143,7 @@ apps/studio/src/
 
 ## The skins
 
-![All 26 skins](media/skins.png)
+![The first 26 skins](media/skins.png)
 
 | Group | Skins |
 |---|---|
@@ -152,6 +152,13 @@ apps/studio/src/
 | Screens and light | hologram (8 beams), vector wireframe, neon, oscilloscope, teletext, pixel sprite |
 | Glitch: signal | glitch, datamosh, databend, video feedback |
 | Glitch: time | window trails, pixel wind, style mosh |
+| House | maxcot (the house sticker), chalkboard, paper cut-out, crayon |
+| Comics | Ben-Day, silver age, noir, webcomic |
+| Cartoon | rubber hose, flat vector, claymation, anime cel |
+| Pixels | Game Boy, 8-bit, isometric, ASCII |
+
+The picture above shows the first 26; open the [skins sheet](https://shibli21.github.io/maxcot/sheet.html?mode=skins)
+for all of them, or **Demos → New looks** in the studio.
 
 ## Development
 

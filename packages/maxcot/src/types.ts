@@ -84,7 +84,7 @@ export interface Ground {
   draw?(ctx: Ctx2D, w: number, h: number, t: number, kit: unknown, view: View): void;
 }
 
-export type SkinGroup = 'drawn' | 'print' | 'screens' | 'signal' | 'time';
+export type SkinGroup = 'drawn' | 'print' | 'screens' | 'signal' | 'time' | 'house' | 'comics' | 'cartoon' | 'pixels';
 /** [tune key, label, min, max, default] */
 export type SkinParam = [string, string, number, number, number];
 export interface Palette { name: string; label: string; value: string[] }

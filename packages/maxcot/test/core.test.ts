@@ -115,10 +115,10 @@ describe('scene', () => {
 });
 
 describe('skins', () => {
-  it('exports 26 uniquely named skins in five groups', () => {
-    expect(allSkins).toHaveLength(26);
-    expect(Object.keys(skinsByName())).toHaveLength(26);
-    expect(new Set(allSkins.map((s) => s.group))).toEqual(new Set(['drawn', 'print', 'screens', 'signal', 'time']));
+  it('exports 42 uniquely named skins in nine groups', () => {
+    expect(allSkins).toHaveLength(42);
+    expect(Object.keys(skinsByName())).toHaveLength(42);
+    expect(new Set(allSkins.map((s) => s.group))).toEqual(new Set(['drawn', 'print', 'screens', 'signal', 'time', 'house', 'comics', 'cartoon', 'pixels']));
     for (const s of allSkins) { expect(typeof s.draw).toBe('function'); expect(s.label).toBeTruthy(); }
   });
 });
