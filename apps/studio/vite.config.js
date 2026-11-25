@@ -9,7 +9,8 @@ export default defineConfig({
   resolve: {
     alias: [
       { find: /^maxcot$/, replacement: lib('index.ts') },
-      { find: /^maxcot\/(skins|film|score|voice|sound|puppet)$/, replacement: lib('$1/index.ts') }
+      { find: /^maxcot\/(skins|film|score|voice|sound|puppet)$/, replacement: lib('$1/index.ts') },
+      { find: /^maxcot-3d$/, replacement: resolve(import.meta.dirname, '../../packages/maxcot-3d/src/index.ts') }
     ]
   },
   build: {

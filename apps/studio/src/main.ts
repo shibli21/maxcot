@@ -30,6 +30,8 @@ import pixelsSrc from '../../../packages/maxcot/src/skins/pixels.ts?raw';
 import filmSrc from '../../../packages/maxcot/src/film/film.ts?raw';
 import voiceSrc from '../../../packages/maxcot/src/voice/analyze.ts?raw';
 import sfxSrc from '../../../packages/maxcot/src/sound/sfx.ts?raw';
+import stage3dSrc from '../../../packages/maxcot-3d/src/stage3d.ts?raw';
+import type { Look3D, Set3D, Stage3D, Framing3D } from 'maxcot-3d';
 import tourScoreRaw from './scores/tour.score?raw';
 import mainSrc from './main.ts?raw';
 // textareas normalise line endings, so compare against the same form
@@ -46,6 +48,8 @@ interface StudioState {
   src: [string, string?] | null; instant?: boolean;
   /** Who score commands without `on:` are for, and who the panels edit. */
   lead: string; selected: string;
+  /** 2D or real 3D (maxcot-3d), and the 3D look and set. */
+  dim: '2d' | '3d'; look3d: Look3D; set3d: Set3D;
 }
 interface Tile { h: Character; shared: boolean; anim: boolean; c: HTMLCanvasElement }
 interface TileOptions { actor: Actor; style: string; palette?: string; shared?: boolean; isStatic?: boolean; frame?: string; key: string; dpr?: number }
@@ -124,6 +128,28 @@ function updateTalks(): void {
     if (voice.target !== a || !voice.active) a.lips = lipsAt(k.track, TALK_FPS, t);
   });
 }
+// real 3D: maxcot-3d (and three.js) load the first time the stage goes 3D
+const LOOK_NAMES = ['toon', 'clay', 'toy', 'hologram'], SET_NAMES = ['studio', 'room', 'street'];
+/** What the 3D button picked: the stage starts in it, and survives a seek (a score's `view` still overrides it). */
+let baseDim: '2d' | '3d' = '2d';
+type M3D = typeof import('maxcot-3d');
+let M3: M3D | null = null, m3load: Promise<M3D> | null = null, stage3d: Stage3D | null = null;
+function load3d(): Promise<M3D> { return m3load || (m3load = import('maxcot-3d').then((m) => (M3 = m))); }
+/** Show the stage in 2D or 3D as ST.dim says, making the 3D stage on first use. */
+function apply3d(): void {
+  const on = ST.dim === '3d'; $('#v-single').classList.toggle('d3', on); $('#b3d').classList.toggle('on', on);
+  if (!on) return;
+  if (!stage3d) {
+    if (!M3) { void load3d().then(() => { apply3d(); layout(); if (ST.panel === 'Styles') buildPanel(); }); return; }
+    stage3d = new M3.Stage3D({ canvas: $<HTMLCanvasElement>('#main3d'), look: ST.look3d, set: ST.set3d });
+    layout();
+  }
+  stage3d.setLook(ST.look3d).setSet(ST.set3d);
+}
+function draw3d(t: number, dt: number): void {
+  const s = stage3d!; s.sync(stage.members.map((m) => ({ id: m.id, actor: m.actor, x: m.x, z: m.z })));
+  s.shot(stage.shotSpec.frame as Framing3D, stage.shotSpec.on); s.draw(t, dt);
+}
 function useStageSkin(name: string): void { if (stage.skin.name !== name) { stage.skin = skin(name); stage.dirty = true; } }
 
 /** Switch a character's skin by name, redrawing only when it really changes. */
@@ -135,10 +161,10 @@ function reset(): void {
     actor: new Actor({ who: 'max' }), style: 'pencil', palette: 'cyan', guides: false, mode: 'single',
     sizesUpTo: 48, grid: 3, sheetKind: 'styles', dealSeed: 0, faces: 1, panel: null, editRow: null, multicam: false,
     card: null, pointer: null, clock: ST.clock || 0, rev: 0, revAt: 0, panelRev: -1, created: false, src: null,
-    lead: 'max', selected: 'max'
+    lead: 'max', selected: 'max', dim: baseDim, look3d: 'toon', set3d: 'studio'
   };
   castOnly('max', ST.actor); K.tune = {};
-  talks.clear(); mixer.hush(); if (voice.active) voice.attach(ST.actor); if (puppet.bound) puppet.attach(ST.actor);
+  apply3d(); talks.clear(); mixer.hush(); if (voice.active) voice.attach(ST.actor); if (puppet.bound) puppet.attach(ST.actor);
   film = null; editor = null; $('#timeline').innerHTML = ''; $('#pointer').style.display = 'none';
   $('#panel').classList.remove('on'); setMode('single');
 }
@@ -148,7 +174,7 @@ function settle(): void {
   if (bts.last >= 0) hiScore(bts.last);
   if (ST.src) showSource(ST.src[0], ST.src[1]);
   if (ST.panel) openPanel(ST.panel); else closePanel();
-  stage.cut();
+  stage.cut(); if (stage3d) stage3d.shot(stage.shotSpec.frame as Framing3D, stage.shotSpec.on, true);
   layout();
 }
 /** Empty the stage and put one actor on it. */
@@ -186,6 +212,15 @@ const CMD: Record<string, Command> = {
   shot(v, ev) { stage.shot(str(v) as StageFraming, ev.on as string | string[] | undefined, !!ev.cut); leaveSpecial(); src('stage'); },
   place(v, ev) { const id = ev.on != null ? String(ev.on) : ST.lead, at = Array.isArray(v) ? v : [v]; if (stage.has(id)) stage.place(id, num(at[0]), at[1] != null ? num(at[1]) : undefined); src('stage'); },
   spread() { stage.spread(); src('stage'); },
+  view(v) {
+    const o = (typeof v === 'string' ? { mode: v } : (v || {})) as { mode?: string; look?: string; set?: string };
+    if (o.look && LOOK_NAMES.includes(o.look)) ST.look3d = o.look as Look3D;
+    if (o.set && SET_NAMES.includes(o.set)) ST.set3d = o.set as Set3D;
+    ST.dim = o.mode === '2d' ? '2d' : '3d';
+    leaveSpecial(); apply3d(); if (stage3d) stage3d.shot(stage.shotSpec.frame as Framing3D, stage.shotSpec.on, true);
+    if (ST.panel === 'Styles' && !ST.instant) buildPanel();
+    src('three');
+  },
   talk(v, ev, ctx) {
     const o = (typeof v === 'number' ? { len: v } : (v || {})) as { len?: number; pitch?: number; seed?: number; vowels?: string };
     const a = actorFor(ev), len = K.clamp(Number(o.len ?? 2) || 2, 0.1, 30);
@@ -277,7 +312,7 @@ function layout(): void {
   const area = $('#viewArea'), W = area.clientWidth, H = area.clientHeight;
   if (!W || !H) return;
   switch (ST.mode) {
-    case 'single': fit($<HTMLCanvasElement>('#main'), W, H); stage.dirty = true; break;
+    case 'single': fit($<HTMLCanvasElement>('#main'), W, H); stage.dirty = true; if (stage3d) { const c3 = $<HTMLCanvasElement>('#main3d'); fit(c3, W, H); stage3d.resize(c3.width, c3.height); } break;
     case 'card': fit($<HTMLCanvasElement>('#cardCanvas'), W, H); break;
     case 'sizes': buildSizes(W, H); break;
     case 'sheet': case 'deal': case 'faces': buildGrid(W, H); break;
@@ -445,6 +480,15 @@ function buildPanel(): void {
   const body = $('#panelBody'), scroll = body.scrollTop; body.innerHTML = ''; ST.panelRev = ST.rev;
   const d = ST.actor.designTo, who = ST.actor.who;
   if (ST.panel === 'Styles') {
+    if (ST.dim === '3d') {
+      body.appendChild(el('h4', null, '3D looks'));
+      const lk = el('div', 'chips'); body.appendChild(lk);
+      (M3 ? M3.LOOKS : []).forEach(([k, label, about]) => { const c = el('div', 'chip' + (k === ST.look3d ? ' on' : ''), label); c.style.padding = '4px 10px'; c.title = about; c.dataset.k = 'look3d:' + k; c.onclick = () => exec('view', { look: k }); lk.appendChild(c); });
+      body.appendChild(el('h4', null, 'Sets'));
+      const st = el('div', 'chips'); body.appendChild(st);
+      (M3 ? M3.SETS : []).forEach(([k, label, about]) => { const c = el('div', 'chip' + (k === ST.set3d ? ' on' : ''), label); c.style.padding = '4px 10px'; c.title = about; c.dataset.k = 'set3d:' + k; c.onclick = () => exec('view', { set: k }); st.appendChild(c); });
+      body.appendChild(el('p', 'note', 'Real 3D with three.js: the engine still draws every face, live. The 2D skins below apply when you switch back to 2D.'));
+    }
     ST.panelHolo = ST.style === 'hologram';
     if (ST.panelHolo) {
       const hg = section(body, 'Hologram beams');
@@ -674,6 +718,16 @@ function validate(events: ScoreEvent[], lines: number[]): Mark[] {
       }
     }
     if (e.palette != null && !PALETTES.has(String(e.palette))) out.push({ line, level: 'warn', message: "no palette called '" + e.palette + "'" });
+    if (e.view != null) {
+      const vv = e.view as Record<string, unknown>;
+      if (typeof vv === 'string') { if (vv !== '2d' && vv !== '3d') out.push({ line, level: 'warn', message: "view is '2d' or '3d'" }); }
+      else if (typeof vv !== 'object' || Array.isArray(vv)) out.push({ line, level: 'warn', message: "view is '2d', '3d' or { mode: '3d', look: 'clay', set: 'room' }" });
+      else for (const key of Object.keys(vv)) {
+        const ok: Record<string, string[]> = { mode: ['2d', '3d'], look: LOOK_NAMES, set: SET_NAMES };
+        if (!ok[key]) out.push({ line, level: 'warn', message: 'view has mode, look and set; not `' + key + '`' });
+        else if (!ok[key]!.includes(String(vv[key]))) out.push({ line, level: 'warn', message: key + ' is one of ' + ok[key]!.join(', ') });
+      }
+    }
     if (e.talk != null) {
       const t = e.talk as Record<string, unknown>;
       if (typeof t === 'number') { if (t <= 0 || t > 30) out.push({ line, level: 'warn', message: 'talk is a length in seconds, up to 30' }); }
@@ -782,6 +836,7 @@ function initEditor(): void {
   $('#bSave').onclick = saveProject;
   $('#bShare').onclick = () => { void shareProject(); };
   $('#bExport').onclick = openExport;
+  $('#b3d').onclick = () => { baseDim = ST.dim === '3d' ? '2d' : '3d'; exec('view', baseDim); };
   $<HTMLInputElement>('#voiceFile').onchange = (e) => { const inp = e.target as HTMLInputElement, f = inp.files && inp.files[0]; if (f) void startVoice('file', f); inp.value = ''; };
   // every .score file in scores/ is a demo
   const demos = import.meta.glob('./scores/*.score', { query: '?raw', import: 'default', eager: true }) as Record<string, string>;
@@ -813,6 +868,7 @@ function showSource(kind: string, name?: string): void {
   if (kind === 'style') { const s = skin(n), f = SKIN_FILE[s.group]!; file = LIB + 'skins/' + f[0] + '.ts'; view = fileAt(f[1], 'Skins.' + s.name + ' = {'); }
   else if (kind === 'pose') { file = LIB + 'rig.ts'; view = fileAt(rigSrc, n.indexOf('feel-') === 0 ? "feel('" + n.slice(5) + "'" : "'" + n + "'"); }
   else if (kind === 'who') { file = LIB + 'design.ts'; view = fileAt(designSrc, "cast('" + n + "'"); }
+  else if (kind === 'three') { file = 'packages/maxcot-3d/src/stage3d.ts'; view = fileAt(stage3dSrc, 'export class Stage3D'); }
   else if (kind === 'sound') { file = LIB + 'sound/sfx.ts'; view = fileAt(sfxSrc, "case '" + n + "'"); }
   else if (kind === 'voice') { file = LIB + 'voice/analyze.ts'; view = fileAt(voiceSrc, 'export function analyze'); }
   else if (kind === 'manner') { file = LIB + 'design.ts'; view = fileAt(designSrc, 'const MANNERS'); }
@@ -899,7 +955,8 @@ function step(dt: number): void {
     if (!stage.members.some((m) => m.actor === ST.actor)) ST.actor.update(dt);
     updatePointer();
     const t = ST.clock;
-    if (ST.mode === 'single') { useStageSkin(ST.style); stage.palette = ST.palette; stage.guides = guidesFor(ST.style); stage.updateCamera(dt); stage.draw(t); }
+    if (ST.mode === 'single' && ST.dim === '3d' && stage3d) draw3d(t, dt);
+    else if (ST.mode === 'single') { useStageSkin(ST.style); stage.palette = ST.palette; stage.guides = guidesFor(ST.style); stage.updateCamera(dt); stage.draw(t); }
     else if (ST.mode === 'card') { if (t - lastCard > 1 / 12 && ST.card) { lastCard = t; const cc = $<HTMLCanvasElement>('#cardCanvas'); card(cc.getContext('2d')!, cc.width, cc.height, t - ST.card.start, ST.card.text); } }
     else if (ST.mode === 'film' && film) {
       const f = film; f.update(dt); editor!.sync();
@@ -939,7 +996,7 @@ function composeView(ctx: CanvasRenderingContext2D, W: number, H: number): void 
   });
 }
 function exportHost(): ExportHost {
-  const was = { t: bts.songT, playing: bts.playing, sound: beat.on, style: null as string | null };
+  const was = { t: bts.songT, playing: bts.playing, sound: beat.on, style: null as string | null, moved: false };
   return {
     begin(w, h) {
       exporting = true; mixer.hush(); mixer.on = false; beat.stop(); bts.setClock(null);
@@ -948,7 +1005,7 @@ function exportHost(): ExportHost {
       was.style = area.getAttribute('style'); area.style.flex = 'none'; area.style.height = ch + 'px'; area.style.width = Math.round(ch * w / h) + 'px';
       DPR = K.clamp(h / ch, 0.5, 4); tilesSig = ''; layout(); stage.cut();   // reframe for the new canvas size
     },
-    seek(t) { bts.seek(t); bts.play(); step(0); },
+    seek(t) { was.moved = true; bts.seek(t); bts.play(); step(0); },
     frame(dt, ctx, w, h) { step(dt); composeView(ctx, w, h); },
     async soundtrack(from, to) {
       const buf = await Beat.render(bts.bpm, to), chans = mixer.mixed(buf), a = Math.round(from * buf.sampleRate);
@@ -957,7 +1014,7 @@ function exportHost(): ExportHost {
     end() {
       const area = $('#viewArea'); if (was.style == null) area.removeAttribute('style'); else area.setAttribute('style', was.style);
       exporting = false; DPR = BASE_DPR; tilesSig = ''; layout(); stage.cut();
-      bts.pause(); setSound(was.sound); bts.seek(was.t); if (was.playing) bts.play();
+      bts.pause(); setSound(was.sound); if (was.moved) bts.seek(was.t); if (was.playing) bts.play();   // a still never moved: keep any hand-made changes
     }
   };
 }
@@ -1031,7 +1088,7 @@ if (!CAPTURE) requestAnimationFrame(loop);
 
 declare global { interface Window { Studio: unknown } }
 window.Studio = {
-  exec, step, openPanel, setMode, conductor: bts, stage, voice, puppet, fx: Fx, startPuppet, exportVideo: runExport, openExport,
+  exec, step, openPanel, setMode, conductor: bts, stage, voice, puppet, fx: Fx, load3d, get stage3d() { return stage3d; }, startPuppet, exportVideo: runExport, openExport,
   renderBeatWav: (sec: number) => Beat.render(bts.bpm, sec).then(Beat.wav64),
   /** The beat plus every logged cue (lines, effects, the film's sound track) as one WAV. */
   renderSoundWav: (sec: number) => Beat.render(bts.bpm, sec).then((b) => mixer.render(b)), mixer,

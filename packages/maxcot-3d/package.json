@@ -1,0 +1,49 @@
+{
+  "name": "maxcot-3d",
+  "version": "0.1.0",
+  "description": "Real 3D for maxcot with three.js: actors as lit meshes with live-drawn faces, 3D looks and sets.",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "src",
+    "README.md"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/shibli21/maxcot.git",
+    "directory": "packages/maxcot-3d"
+  },
+  "keywords": [
+    "maxcot",
+    "three",
+    "3d",
+    "character",
+    "animation"
+  ],
+  "peerDependencies": {
+    "maxcot": ">=0.1.0",
+    "three": ">=0.160.0"
+  },
+  "devDependencies": {
+    "@napi-rs/canvas": "^1.2.0",
+    "@types/three": "^0.187.0",
+    "maxcot": "workspace:*",
+    "three": "^0.187.0",
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.1"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  }
+}

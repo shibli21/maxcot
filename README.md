@@ -102,6 +102,13 @@ zap, blip, slide, tada, crash), all synthesised in code. The film has its own **
 timeline (`edit: 'Sound'`) with effects and spoken lines you can drag, swap, add and delete
 (**Demos → Sound check**). A recorded video carries all of it: the beat, every line and every effect.
 
+Press **3D** (or put `{ at: [2, 1], view: '3d' }` in a score) and the stage becomes real 3D with
+three.js: lit, rounded actors whose faces the engine still draws live, in four looks (toon, clay,
+vinyl toy, hologram) and three sets (studio cyclorama, room, street at night). `view: { look: 'clay',
+set: 'room' }` changes them and `view: '2d'` cuts back (**Demos → Into 3D**). It lives in its own
+package, [`maxcot-3d`](packages/maxcot-3d), with three.js as a peer dependency, and the studio only
+loads it when you first go 3D.
+
 The **Puppet** tab lets you play the selected actor live: the mouse steers where they look, holding
 the button makes them talk, keys 1-9 strike poses (W hops, A and D step), and a gamepad works too.
 Tick **Record** and press play: the poses you strike are written into the score at the beats you hit.

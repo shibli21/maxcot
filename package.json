@@ -11,7 +11,7 @@
     "build": "bun --filter @maxcot/studio build",
     "record": "bun apps/studio/scripts/record.mjs",
     "typecheck": "bun --filter \"*\" typecheck",
-    "test": "bun --filter maxcot test && bun --filter @maxcot/studio test",
+    "test": "bun --filter maxcot test && bun --filter maxcot-3d test && bun --filter @maxcot/studio test",
     "build:lib": "bun --filter maxcot build"
   }
 }

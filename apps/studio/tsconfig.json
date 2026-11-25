@@ -12,7 +12,8 @@
     "skipLibCheck": true,
     "paths": {
       "maxcot": ["../../packages/maxcot/src/index.ts"],
-      "maxcot/*": ["../../packages/maxcot/src/*/index.ts"]
+      "maxcot/*": ["../../packages/maxcot/src/*/index.ts"],
+      "maxcot-3d": ["../../packages/maxcot-3d/src/index.ts"]
     }
   },
   "include": ["src"]

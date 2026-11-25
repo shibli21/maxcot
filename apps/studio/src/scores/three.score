@@ -1,0 +1,44 @@
+// three.score: real 3D. `view: '3d'` cuts the stage to three.js and
+// `view: '2d'` cuts back; `view: { look, set }` changes what the actors are
+// made of (toon, clay, toy, hologram) and where they stand (studio, room,
+// street). The engine still draws every face live, so poses, talk and the
+// puppet all work in 3D.
+{
+  title: 'Into 3D',
+  bpm: 100,
+  tail: 3,
+  events: [
+    { at: [1, 1], create: 'max' },
+    { at: [1, 1], style: 'felttip' },
+    { at: [1, 2], pose: 'wave' },
+    { at: [1, 3], talk: 1.2 },
+    // the cut
+    { at: [2, 1], view: { mode: '3d', look: 'toon', set: 'studio' } },
+    { at: [2, 1], sfx: 'whoosh' },
+    { at: [2, 2], pose: 'feel-surprised' },
+    { at: [2, 3], look: 'us' },
+    { at: [2, 4], pose: 'thumbsup' },
+    { at: [3, 1], enter: { id: 'gran', who: 'grandma' } },
+    { at: [3, 1], view: { look: 'clay', set: 'room' } },
+    { at: [3, 2], look: 'gran' },
+    { at: [3, 2], look: 'max', on: 'gran' },
+    { at: [3, 3], talk: { len: 1.6, vowels: 'aoa' }, on: 'gran' },
+    { at: [4, 1], shot: 'close', on: 'max' },
+    { at: [4, 1], view: { look: 'toy' } },
+    { at: [4, 2], pose: 'feel-laughing' },
+    { at: [4, 2], talk: 1.4 },
+    { at: [5, 1], shot: 'wide' },
+    { at: [5, 1], view: { look: 'hologram', set: 'street' } },
+    { at: [5, 1], sfx: 'zap' },
+    { at: [5, 2], pose: 'cheer', on: 'gran' },
+    { at: [5, 3], pose: 'arms-up' },
+    // and back
+    { at: [6, 1], view: '2d' },
+    { at: [6, 1], style: 'riso' },
+    { at: [6, 2], look: 'us' },
+    { at: [6, 2], look: 'us', on: 'gran' },
+    { at: [6, 3], pose: 'wave' },
+    { at: [6, 3], pose: 'wave', on: 'gran' },
+    { at: [7, 1], end: { card: 'logo', text: 'INTO 3D' } }
+  ]
+}

@@ -14,7 +14,9 @@
   "dependencies": {
     "gifenc": "^1.0.3",
     "maxcot": "workspace:*",
-    "mp4-muxer": "^5.2.2"
+    "maxcot-3d": "workspace:*",
+    "mp4-muxer": "^5.2.2",
+    "three": "^0.187.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.65.1",
