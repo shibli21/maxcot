@@ -152,3 +152,8 @@ button { font: inherit; }
 .vbtns button.on { background: #111; color: #fff; border-color: #111; }
 .meter { height: 8px; background: #ecebe5; margin: 0 0 8px; overflow: hidden; }
 .meter i { display: block; height: 100%; width: 0; background: #111; transition: width 60ms linear; }
+.blk.snd { background: #fdf3d9; border-color: #e2cf9a; padding-left: 6px; cursor: grab; }
+.blk.snd.say { background: #e4f0fb; border-color: #a9c6e0; }
+.tl-picker .tl-btn.snd, .tl-picker .snd-add, .tl-picker .snd-del { align-self: center; white-space: nowrap; }
+.tl-picker .snd-add { font-weight: 600; }
+.tl-picker .snd-del { color: #b3261e; border-color: #e3b5b1; }

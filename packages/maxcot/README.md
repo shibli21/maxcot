@@ -8,7 +8,7 @@ line, hatch and halftone dot is generated on a 2D canvas, in the browser or in N
 npm install maxcot      # or: bun add maxcot
 ```
 
-Strict TypeScript, ES modules, zero runtime dependencies. Five entry points:
+Strict TypeScript, ES modules, zero runtime dependencies. Six entry points:
 
 | Import | What it gives you |
 |---|---|
@@ -17,6 +17,7 @@ Strict TypeScript, ES modules, zero runtime dependencies. Five entry points:
 | `maxcot/film` | `Player` (shots, beats, who/style tracks, cameras), a DOM timeline `Editor`, `card` |
 | `maxcot/score` | `createConductor`: sequence anything in bars and beats, with exact seeking |
 | `maxcot/voice` | lip-sync from sound: a live `Voice` (microphone or file), offline `lipTrack`, a `babble` test voice |
+| `maxcot/sound` | synthesised effects (`sfx`), spoken-line clips, and a mixer that writes WAV |
 
 ## A character on a canvas
 
@@ -98,6 +99,26 @@ actor.lips = lipsAt(track, 60, t);                // null lets go of the mouth a
 
 `actor.lips` only opens the mouth further and reshapes it while there is sound, so a smile or
 a sneer underneath still shows.
+
+## Sound
+
+`maxcot/sound` makes everything as plain samples, so a live page and an offline export
+sound the same. Ten effects are synthesised from scratch: `pop`, `boing`, `whoosh`, `ding`,
+`thud`, `zap`, `blip`, `slide`, `tada`, `crash`.
+
+```ts
+import { sfx, mixdown, wav } from 'maxcot/sound';
+
+const ding = sfx('ding', { sampleRate: 48000 });
+const track = mixdown([{ at: 0.5, samples: ding, sampleRate: 48000 }], 3);   // 3 s, mono, 48 kHz
+const bytes = wav([track], 48000);                                             // a .wav file
+```
+
+A film can carry a sound track: `tracks.sound` is a list of clips, each an effect or a spoken
+line (`{ at: 0.9, say: { len: 1.1, vowels: 'eoa' } }`). The `Player` moves the mouth of whoever
+plays the part while a line is spoken, and calls `onSound(clip, index, offset)` as playback reaches
+each clip so the host can play it (`clipSamples(clip, who)` gives the samples). The `Editor`
+shows a Sound row: drag clips along it, swap them, add or delete them.
 
 ## Sequencing with a score
 

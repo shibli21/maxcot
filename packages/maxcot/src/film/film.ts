@@ -3,7 +3,9 @@ import K from '../kit.js';
 import { Actor } from '../rig.js';
 import { CAST } from '../design.js';
 import { render, camera, type RenderOptions } from '../character.js';
-import type { Ctx2D, Framing, Skin } from '../types.js';
+import type { Ctx2D, Framing, Lips, Skin } from '../types.js';
+import { clipLength, clipSamples, lineOf, SFX_LABEL, type SoundClip } from '../sound/index.js';
+import { lipTrack, lipsAt } from '../voice/analyze.js';
 
 // ── the film format ─────────────────────────────────────────────────────────
 export interface FilmCamera { id?: string; label?: string; frame: Framing | string; on?: string; kind?: 'handheld' | 'push' | 'speaker' | string }
@@ -18,12 +20,15 @@ export interface Film {
   title: string;
   actor: { key: string; label: string };
   shots: Shot[];
-  tracks: { who?: WhoSegment[]; style?: StyleSegment[] };
+  tracks: { who?: WhoSegment[]; style?: StyleSegment[]; sound?: SoundClip[] };
   /** Alternative cameras for multicam switching. */
   cameras?: FilmCamera[];
   end?: { card: 'logo'; len: number; text?: string };
 }
 export type TrackName = 'who' | 'style';
+/** A row the editor can select blocks in. */
+export type EditRow = TrackName | 'sound';
+export type { SoundClip };
 export type Aspect = 'wide' | 'tall' | 'square' | 'portrait';
 type TimedBeat = FilmBeat & { t: number; shot: string };
 
@@ -48,6 +53,8 @@ export function card(ctx: Ctx2D, w: number, h: number, t: number, text: string):
 
 // ── Player ───────────────────────────────────────────────────────────────
 export interface PlayerOptions {
+  /** Called when playback reaches a sound clip; `offset` is how far past its start the clock already is. */
+  onSound?: (clip: SoundClip, index: number, offset: number) => void;
   /** name → skin, so the film's tracks can name their styles as plain strings. */
   skins?: Record<string, Skin>;
   cardText?: string;
@@ -68,9 +75,12 @@ export class Player {
   total: number;
   who = '';
   actor!: Actor;
+  /** See PlayerOptions.onSound. */
+  onSound: ((clip: SoundClip, index: number, offset: number) => void) | null;
+  private lipCache = new WeakMap<SoundClip, { key: string; track: Lips[] }>();
 
   constructor(film: Film, o: PlayerOptions = {}) {
-    this.film = film; this.skins = o.skins || {}; this.cardText = o.cardText || (film.end && film.end.text) || 'MAXCOT';
+    this.film = film; this.skins = o.skins || {}; this.onSound = o.onSound || null; this.cardText = o.cardText || (film.end && film.end.text) || 'MAXCOT';
     this.total = film.shots.reduce((a, s) => Math.max(a, s.from + s.len), 0) + (film.end ? film.end.len : 0);
     this.seek(0);
   }
@@ -100,16 +110,28 @@ export class Player {
     this.t = K.clamp(t, 0, this.total); this.who = this.whoAt(this.t);
     this.actor = new Actor({ who: this.who, t: this.t });
     this.beats().forEach((b) => { if (b.t <= this.t) this.apply(b); });
-    this.actor.snap();
+    this.actor.snap(); this.speak();
+  }
+  /** The film's sound clips, in time order. */
+  sounds(): SoundClip[] { return (this.film.tracks.sound || []).slice().sort((a, b) => a.at - b.at); }
+  /** The spoken line under `t`, if any. */
+  lineAt(t: number): SoundClip | null { for (const c of this.film.tracks.sound || []) { const l = lineOf(c); if (l && t >= c.at && t < c.at + l.len) return c; } return null; }
+  /** Move the speaker's mouth for the line being spoken (if any). */
+  private speak(): void {
+    const c = this.lineAt(this.t); if (!c) { this.actor.lips = null; return; }
+    const who = this.whoAt(c.at), key = who + JSON.stringify(c.say); let k = this.lipCache.get(c);
+    if (!k || k.key !== key) { k = { key, track: lipTrack(clipSamples(c, who, 22050), 22050, 60) }; this.lipCache.set(c, k); }
+    this.actor.lips = lipsAt(k.track, 60, this.t - c.at);
   }
   update(dt: number): void {
     if (this.playing) {
       const t0 = this.t, t1 = Math.min(this.total, this.t + dt);
       this.beats().forEach((b) => { if (b.t > t0 && b.t <= t1) this.apply(b); });
+      const on = this.onSound; if (on) (this.film.tracks.sound || []).forEach((c, i) => { if (c.at >= t0 && c.at < t1 && (c.at > 0 || t0 === 0)) on(c, i, t1 - c.at); });
       this.t = t1; if (t1 >= this.total) this.playing = false;
     }
     const who = this.whoAt(this.t); if (who !== this.who) { this.who = who; this.actor.cast(who); }
-    this.actor.update(this.playing ? dt : Math.min(dt, 0.02));
+    this.actor.update(this.playing ? dt : Math.min(dt, 0.02)); this.speak();
   }
   camera(override?: number): FilmCamera {
     const shot = this.shotAt(this.t), cams = this.film.cameras || [];
@@ -142,7 +164,7 @@ function el<K2 extends keyof HTMLElementTagNameMap>(tag: K2, cls?: string, txt?:
 }
 export interface EditorOptions {
   /** A block was selected: show a picker for that row. */
-  onPick?: (row: TrackName, seg: WhoSegment | StyleSegment) => void;
+  onPick?: (row: EditRow, seg: WhoSegment | StyleSegment | SoundClip) => void;
   /** The film's tracks changed (a block was retimed or reassigned). */
   onChange?: () => void;
   onAspect?: (aspect: Aspect) => void;
@@ -153,7 +175,7 @@ export class Editor {
   player: Player;
   /** Pixels per second. */
   pps = 60;
-  sel: { row: TrackName; i: number } | null = null;
+  sel: { row: EditRow; i: number } | null = null;
   picker: HTMLDivElement;
   private onPick?: EditorOptions['onPick'];
   private onChange?: EditorOptions['onChange'];
@@ -181,7 +203,7 @@ export class Editor {
     zm.onclick = () => { this.pps = Math.max(20, this.pps / 1.25); this.layout(); }; zp.onclick = () => { this.pps = Math.min(240, this.pps * 1.25); this.layout(); };
     zoom.appendChild(zm); zoom.appendChild(zp);
     this.ruler = el('div', 'tl-lane tl-ruler'); grid.appendChild(zoom); grid.appendChild(this.ruler);
-    ([['shots', 'Shots'], ['camera', 'Camera'], ['actor', player.film.actor.label, true], ['who', 'Who plays it'], ['style', 'Style']] as Array<[string, string, boolean?]>).forEach((r) => {
+    ([['shots', 'Shots'], ['camera', 'Camera'], ['actor', player.film.actor.label, true], ['who', 'Who plays it'], ['style', 'Style'], ['sound', 'Sound']] as Array<[string, string, boolean?]>).forEach((r) => {
       const lab = el('div', 'tl-label' + (r[2] ? ' tl-actor' : ''), r[1]), lane = el('div', 'tl-lane' + (r[2] ? ' tl-actor' : ''));
       grid.appendChild(lab); grid.appendChild(lane); this.rows[r[0]] = { label: lab, lane: lane };
       lane.addEventListener('mousedown', (e) => { if (e.target === lane) this.seekTo(e, lane); });
@@ -224,7 +246,32 @@ export class Editor {
         });
       });
     });
+    (F.tracks.sound || []).forEach((c, i) => {
+      const line = lineOf(c), b = el('div', 'blk edit snd' + (line ? ' say' : '') + (this.sel && this.sel.row === 'sound' && this.sel.i === i ? ' sel' : ''));
+      b.textContent = line ? '“…” ' + line.len.toFixed(1) + 's' : (SFX_LABEL as Record<string, string>)[c.sfx || ''] || c.sfx || '?';
+      this.place(b, c.at, c.at + Math.max(0.25, clipLength(c))); this.lane('sound').appendChild(b);
+      b.addEventListener('mousedown', (e) => { e.stopPropagation(); this.select('sound', i); this.slide(e, i); });
+    });
     this.sync();
+  }
+  /** Drag a sound clip along the timeline. */
+  private slide(e: MouseEvent, i: number): void {
+    const c = (this.player.film.tracks.sound || [])[i]; if (!c) return;
+    const x0 = e.clientX, v0 = c.at;
+    const move = (ev: MouseEvent) => { c.at = Math.round(K.clamp(v0 + (ev.clientX - x0) / this.pps, 0, this.player.total - 0.1) * 20) / 20; this.layout(); if (this.onChange) this.onChange(); };
+    const up = () => { window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up); };
+    window.addEventListener('mousemove', move); window.addEventListener('mouseup', up);
+  }
+  /** Add a sound clip (at the playhead unless `at` is given) and select it. */
+  addSound(clip: Partial<SoundClip> = {}): void {
+    const F = this.player.film, L = F.tracks.sound || (F.tracks.sound = []);
+    L.push(Object.assign({ at: Math.round(this.player.t * 20) / 20, sfx: 'pop' }, clip));
+    this.select('sound', L.length - 1); if (this.onChange) this.onChange();
+  }
+  /** Delete the selected sound clip. */
+  removeSound(): void {
+    if (!this.sel || this.sel.row !== 'sound') return; const L = this.player.film.tracks.sound || [];
+    L.splice(this.sel.i, 1); this.sel = null; this.layout(); if (this.onChange) this.onChange();
   }
   private drag(e: MouseEvent, row: TrackName, i: number, edge: 'from' | 'to'): void {
     const L: Array<WhoSegment | StyleSegment> = this.player.film.tracks[row] || [], seg = L[i]!, x0 = e.clientX, v0 = seg[edge];
@@ -234,16 +281,17 @@ export class Editor {
     window.addEventListener('mousemove', move); window.addEventListener('mouseup', up);
   }
   /** Select a block (by default the one under the playhead) and open its picker. */
-  select(row: TrackName, i?: number): void {
-    const L: Array<WhoSegment | StyleSegment> = this.player.film.tracks[row] || [];
-    if (i == null) { const t = this.player.t; let pick = 0; L.forEach((s, j) => { if (t >= s.from) pick = j; }); i = pick; }
+  select(row: EditRow, i?: number): void {
+    const L: Array<WhoSegment | StyleSegment | SoundClip> = this.player.film.tracks[row] || [];
+    if (i == null) { const t = this.player.t; let pick = 0; L.forEach((s, j) => { if (t >= ('at' in s ? s.at : s.from)) pick = j; }); i = pick; }
     const seg = L[i]; if (!seg) return;
     this.sel = { row: row, i: i }; this.layout(); if (this.onPick) this.onPick(row, seg);
   }
   /** Set the selected block's actor or skin. */
   assign(value: string): void {
     if (!this.sel) return; const seg = (this.player.film.tracks[this.sel.row] || [])[this.sel.i]; if (!seg) return;
-    if ('who' in seg) seg.who = value; else seg.style = value;
+    if ('at' in seg) { if (value === 'line') { seg.say = seg.say || 1.5; delete seg.sfx; } else { seg.sfx = value; delete seg.say; } }
+    else if ('who' in seg) seg.who = value; else seg.style = value;
     this.layout(); this.player.seek(this.player.t); if (this.onChange) this.onChange();
   }
   /** Update the clock, the play button and the playhead. */

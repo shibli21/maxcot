@@ -1,7 +1,8 @@
 // scripts/record.mjs: render the score to an MP4.
 // Serves the studio with Vite, opens it with ?capture in headless Chrome, steps the studio one frame at a
 // time (so the result never drops a frame, however slow the machine), pipes
-// each screenshot into ffmpeg and muxes in the synth beat rendered offline.
+// each screenshot into ffmpeg, then muxes in the soundtrack: the synth beat rendered offline plus every
+// line, effect and film sound the studio logged while it played.
 //
 //   bun run record                                  → out/maxcot.mp4, 1920×1080, 30 fps
 //   bun run record --start=17 --end=24 --out=out/clip.mp4
@@ -9,7 +10,7 @@
 import puppeteer from 'puppeteer-core';
 import { createServer } from 'vite';
 import { spawn } from 'node:child_process';
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -46,16 +47,11 @@ try {
   const start = Math.max(0, +(args.start || 0)), end = Math.min(total, +(args.end || total));
   const frames = Math.ceil((end - start) * FPS);
 
-  // the soundtrack, rendered offline and sample-accurate to the score
-  const wav = join(dirname(out), 'beat.wav');
-  const b64 = await page.evaluate((sec) => Studio.renderBeatWav(sec), total);
-  writeFileSync(wav, Buffer.from(b64, 'base64'));
-
+  // pictures first (the studio logs each sound as it plays), then the soundtrack
+  const silent = join(dirname(out), 'pictures.mp4'), wav = join(dirname(out), 'sound.wav');
   const ff = spawn('ffmpeg', [
     '-y', '-loglevel', 'error', '-f', 'image2pipe', '-framerate', String(FPS), '-i', '-',
-    '-ss', String(start), '-i', wav, '-map', '0:v', '-map', '1:a',
-    '-c:v', 'libx264', '-preset', 'slow', '-crf', '18', '-pix_fmt', 'yuv420p', '-r', String(FPS),
-    '-c:a', 'aac', '-b:a', '192k', '-shortest', '-movflags', '+faststart', out
+    '-c:v', 'libx264', '-preset', 'slow', '-crf', '18', '-pix_fmt', 'yuv420p', '-r', String(FPS), silent
   ], { stdio: ['pipe', 'inherit', 'inherit'] });
   const done = new Promise((ok, fail) => ff.on('close', (c) => (c ? fail(new Error('ffmpeg exited ' + c)) : ok())));
 
@@ -68,6 +64,15 @@ try {
     if (i % FPS === 0) process.stdout.write(`\r${(start + i / FPS).toFixed(0).padStart(3)}s / ${end.toFixed(0)}s  (${((Date.now() - t0) / 1000).toFixed(0)}s elapsed)`);
   }
   ff.stdin.end(); await done;
+
+  // the beat rendered offline, sample-accurate to the score, with every logged cue mixed on top
+  const b64 = await page.evaluate((sec) => Studio.renderSoundWav(sec), total);
+  writeFileSync(wav, Buffer.from(b64, 'base64'));
+  await new Promise((ok, fail) => spawn('ffmpeg', [
+    '-y', '-loglevel', 'error', '-i', silent, '-ss', String(start), '-i', wav, '-map', '0:v', '-map', '1:a',
+    '-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k', '-shortest', '-movflags', '+faststart', out
+  ], { stdio: 'inherit' }).on('close', (c) => (c ? fail(new Error('ffmpeg exited ' + c)) : ok())));
+  rmSync(silent, { force: true }); rmSync(wav, { force: true });
   console.log(`\nwrote ${out}`);
 } finally {
   await browser.close();

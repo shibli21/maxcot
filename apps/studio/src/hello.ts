@@ -1,5 +1,5 @@
 // hello.ts: a 13-second film. Shots hold beats (poses, looks);
-// the editable tracks say who plays the part and which skin it is drawn in.
+// the editable tracks say who plays the part, which skin it is drawn in, and what it sounds like.
 import type { Film } from 'maxcot/film';
 
 const hello: Film = {
@@ -26,7 +26,18 @@ const hello: Film = {
   ],
   tracks: {
     who: [{ from: 0, to: 7.8, who: 'oldman' }],
-    style: [{ from: 0, to: 7.8, style: 'pencil' }, { from: 8.3, to: 9.8, style: 'pixelwind', blend: 'wipe' }, { from: 9.8, to: 11.3, style: 'pencil', blend: 'wipe' }]
+    style: [{ from: 0, to: 7.8, style: 'pencil' }, { from: 8.3, to: 9.8, style: 'pixelwind', blend: 'wipe' }, { from: 9.8, to: 11.3, style: 'pencil', blend: 'wipe' }],
+    // effects and spoken lines; a line moves the mouth of whoever plays the part
+    sound: [
+      { at: 0.9, say: { len: 1.1, vowels: 'eoa' } },
+      { at: 2.35, say: { len: 1.0, seed: 4 } },
+      { at: 3.6, sfx: 'ding' },
+      { at: 4.9, sfx: 'slide' },
+      { at: 6.25, say: { len: 0.9, vowels: 'uoo' } },
+      { at: 8.3, sfx: 'whoosh' },
+      { at: 9.8, sfx: 'whoosh' },
+      { at: 10.55, sfx: 'tada' }
+    ]
   },
   cameras: [
     { id: 'A', label: 'Full', frame: 'full' },

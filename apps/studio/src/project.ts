@@ -105,12 +105,20 @@ function checkFilm(v: unknown): Film | null {
   const who = v.tracks.who === undefined ? [] : list(v.tracks.who, (s) => (isObj(s) && num(s.from, 0) && num(s.to, 0) && str(s.who) ? { from: s.from, to: s.to, who: s.who } : null));
   const style = v.tracks.style === undefined ? [] : list(v.tracks.style, (s) => (isObj(s) && num(s.from, 0) && num(s.to, 0) && str(s.style) && (s.blend === undefined || s.blend === 'wipe')
     ? { from: s.from, to: s.to, style: s.style, ...(s.blend === 'wipe' && { blend: 'wipe' as const }) } : null));
+  const say = (x: unknown) => (num(x, 0.1, 30) ? x : isObj(x) && num(x.len, 0.1, 30) && (x.pitch === undefined || num(x.pitch, 0.2, 4)) && (x.seed === undefined || num(x.seed))
+    && (x.vowels === undefined || (str(x.vowels, 40) && /^[aeiou]*$/.test(x.vowels)))
+    ? { len: x.len as number, ...(x.pitch !== undefined && { pitch: x.pitch as number }), ...(x.seed !== undefined && { seed: x.seed as number }), ...(x.vowels !== undefined && { vowels: x.vowels as string }) } : null);
+  const sound = v.tracks.sound === undefined ? undefined : list(v.tracks.sound, (c) => {
+    if (!isObj(c) || !num(c.at, 0) || (c.sfx === undefined) === (c.say === undefined) || (c.sfx !== undefined && !str(c.sfx, 40)) || (c.gain !== undefined && !num(c.gain, 0, 2))) return null;
+    const line = c.say === undefined ? undefined : say(c.say); if (line === null) return null;
+    return { at: c.at, ...(c.sfx !== undefined && { sfx: c.sfx as string }), ...(line !== undefined && { say: line }), ...(c.gain !== undefined && { gain: c.gain as number }) };
+  });
   const cameras = v.cameras === undefined ? undefined : list(v.cameras, camera);
   const end = v.end === undefined ? undefined : isObj(v.end) && v.end.card === 'logo' && num(v.end.len, 0, 60) && (v.end.text === undefined || str(v.end.text, 40))
     ? { card: 'logo' as const, len: v.end.len, ...(v.end.text !== undefined && { text: v.end.text as string }) } : null;
-  if (!shots || !who || !style || cameras === null || end === null) return null;
+  if (!shots || !who || !style || sound === null || cameras === null || end === null) return null;
   return {
-    title: v.title, actor: { key: v.actor.key, label: v.actor.label }, shots, tracks: { who, style },
+    title: v.title, actor: { key: v.actor.key, label: v.actor.label }, shots, tracks: { who, style, ...(sound && { sound }) },
     ...(cameras && { cameras }), ...(end && { end })
   };
 }

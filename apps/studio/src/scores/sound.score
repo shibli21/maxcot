@@ -1,0 +1,35 @@
+// sound.score: sound on. `sfx` plays a synthesised effect (pop, boing, whoosh,
+// ding, thud, zap, blip, slide, tada, crash) and `talk` a spoken line. The film
+// has a Sound track of its own: `edit: 'Sound'` opens it on the timeline, where
+// you can drag clips, swap them or add more. Exported videos carry all of it.
+{
+  title: 'Sound check',
+  bpm: 100,
+  tail: 2,
+  events: [
+    { at: [1, 1], create: 'max' },
+    { at: [1, 1], style: 'gloss' },
+    { at: [1, 2], pose: 'wave' },
+    { at: [1, 2], sfx: 'pop' },
+    { at: [1, 3], talk: 1.2 },
+    { at: [2, 1], pose: 'feel-surprised' },
+    { at: [2, 1], sfx: 'boing' },
+    { at: [2, 3], pose: 'point-up' },
+    { at: [2, 3], sfx: 'slide' },
+    // the kid crashes in
+    { at: [3, 1], enter: { id: 'kid', who: 'child' } },
+    { at: [3, 1], sfx: 'whoosh' },
+    { at: [3, 2], pose: 'feel-terrified', on: 'kid' },
+    { at: [3, 2], sfx: 'zap' },
+    { at: [3, 3], talk: { len: 1, pitch: 1.1 }, on: 'kid' },
+    { at: [4, 1], pose: 'facepalm' },
+    { at: [4, 1], sfx: 'thud' },
+    { at: [4, 3], pose: 'thumbsup' },
+    { at: [4, 3], sfx: 'ding' },
+    // the film and its own sound track
+    { at: [5, 1], edit: 'Sound' },
+    { at: [5, 3], play: 'film' },
+    { at: [11, 2], sfx: 'crash' },
+    { at: [11, 3], end: { card: 'logo', text: 'SOUND ON' } }
+  ]
+}

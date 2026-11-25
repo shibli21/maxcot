@@ -25,6 +25,10 @@
     "./voice": {
       "types": "./dist/voice/index.d.ts",
       "default": "./dist/voice/index.js"
+    },
+    "./sound": {
+      "types": "./dist/sound/index.d.ts",
+      "default": "./dist/sound/index.js"
     }
   },
   "files": [

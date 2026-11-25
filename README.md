@@ -97,7 +97,12 @@ actor's own voice, and the mouth follows the sound (**Demos → Small talk**). T
 lip-syncs the selected actor to your microphone, an audio file or a test voice. The sound is
 analysed on the page and never recorded or sent anywhere.
 
-Each verb (`create`, `enter`, `exit`, `shot`, `look`, `style`, `pose`, `who`, `set`, `talk`, `play`, `camera`, `end` and the rest) is
+There are **sound effects** too: `{ at: [2, 1], sfx: 'boing' }` (pop, boing, whoosh, ding, thud,
+zap, blip, slide, tada, crash), all synthesised in code. The film has its own **Sound** row on the
+timeline (`edit: 'Sound'`) with effects and spoken lines you can drag, swap, add and delete
+(**Demos → Sound check**). A recorded video carries all of it: the beat, every line and every effect.
+
+Each verb (`create`, `enter`, `exit`, `shot`, `look`, `style`, `pose`, `who`, `set`, `talk`, `sfx`, `play`, `camera`, `end` and the rest) is
 one function in the studio's `CMD` table, and the UI calls the same functions, so anything
 the score can do, you can do by hand.
 
@@ -164,8 +169,9 @@ bun run build:lib   # the library, to packages/maxcot/dist
 ## Rendering a video
 
 `?capture` turns off the studio's real-time clock so it can be stepped one frame at a
-time. The recorder drives it in headless Chrome and pipes frames, plus the beat rendered
-offline, into ffmpeg:
+time. The recorder drives it in headless Chrome and pipes the frames into ffmpeg. The studio
+logs every line, effect and film sound as it plays, so the soundtrack (the beat rendered
+offline with all of those mixed on top) is muxed in afterwards:
 
 ```sh
 bun run record                                   # out/maxcot.mp4, 1920×1080, 30 fps

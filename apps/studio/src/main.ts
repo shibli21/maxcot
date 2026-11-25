@@ -4,11 +4,13 @@
 // functions, so anything the score can do, a person can do by hand.
 import { kit as K, Actor, Character, Stage, CAST, DESIGN, POSES, POSE_SECTIONS, render, type DesignRow, type DesignValues, type Manner, type Skin, type StageFraming } from 'maxcot';
 import { GROUPS, allSkins, skinsByName } from 'maxcot/skins';
-import { Editor, Player, card, type Film, type StyleSegment, type TrackName, type WhoSegment } from 'maxcot/film';
+import { Editor, Player, card, type EditRow, type Film, type SoundClip, type StyleSegment, type WhoSegment } from 'maxcot/film';
+import { SFX, SFX_LABEL, clipSamples, sfx as sfxSamples } from 'maxcot/sound';
 import { createConductor, parseScore, type CommandContext, type Conductor, type ScheduledEvent, type ScoreEvent } from 'maxcot/score';
 import { Voice, babble, lipTrack, lipsAt, pitchOf, type Lips } from 'maxcot/voice';
 import hello from './hello';
 import Beat from './beat';
+import Mixer from './mixer';
 import { decodeShare, encodeShare, fileName, makeProject, readProject, type Project } from './project';
 import './studio.css';
 // The code panes show the real source files.
@@ -21,6 +23,7 @@ import screensSrc from '../../../packages/maxcot/src/skins/screens.ts?raw';
 import glitchSrc from '../../../packages/maxcot/src/skins/glitch.ts?raw';
 import filmSrc from '../../../packages/maxcot/src/film/film.ts?raw';
 import voiceSrc from '../../../packages/maxcot/src/voice/analyze.ts?raw';
+import sfxSrc from '../../../packages/maxcot/src/sound/sfx.ts?raw';
 import tourScoreRaw from './scores/tour.score?raw';
 import mainSrc from './main.ts?raw';
 // textareas normalise line endings, so compare against the same form
@@ -31,7 +34,7 @@ type Panel = 'Styles' | 'Tune' | 'Poses' | 'Design' | 'Motion' | 'Voice';
 interface StudioState {
   actor: Actor; style: string; palette: string; guides: boolean; mode: Mode;
   sizesUpTo: number; grid: number; sheetKind: string; dealSeed: number; faces: number;
-  panel: Panel | null; panelHolo?: boolean; editRow: TrackName | null; multicam: boolean;
+  panel: Panel | null; panelHolo?: boolean; editRow: EditRow | null; multicam: boolean;
   card: { text: string; start: number } | null; pointer: { start: number } | null;
   clock: number; rev: number; revAt: number; panelRev: number; created: boolean;
   src: [string, string?] | null; instant?: boolean;
@@ -69,20 +72,19 @@ const voice = new Voice();
 const TALK_SR = 22050, TALK_FPS = 60;
 interface Talk { start: number; len: number; track: Lips[] }
 const talks = new Map<Actor, Talk>();
-let talkAudio: AudioContext | null = null, talkNodes: AudioBufferSourceNode[] = [];
-function sayOutLoud(samples: Float32Array, offset: number): void {
-  try {
-    if (!talkAudio) talkAudio = new AudioContext();
-    if (talkAudio.state === 'suspended') void talkAudio.resume();
-    const b = talkAudio.createBuffer(1, samples.length, TALK_SR); b.getChannelData(0).set(samples);
-    const s = talkAudio.createBufferSource(); s.buffer = b; const g = talkAudio.createGain(); g.gain.value = 0.55;
-    s.connect(g); g.connect(talkAudio.destination); s.start(0, Math.max(0, offset));
-    s.onended = () => { talkNodes = talkNodes.filter((n) => n !== s); }; talkNodes.push(s);
-  } catch { /* no audio here: the mouth still moves */ }
+// every sound besides the beat goes through the mixer, which also logs it for export
+const mixer = new Mixer();
+let wasPlaying = false;
+const sfxCache = new Map<string, Float32Array>();
+function sfxOf(name: string): Float32Array { let s = sfxCache.get(name); if (!s) { s = sfxSamples(name, { sampleRate: 44100 }); sfxCache.set(name, s); } return s; }
+/** A film clip reached during playback: play it, and log it on the song clock when the score is running. */
+function filmSound(clip: SoundClip, i: number, offset: number): void {
+  if (!film) return; const who = film.whoAt(clip.at), line = clip.say != null;
+  const at = bts.songT - offset, samples = line ? clipSamples(clip, who, TALK_SR) : sfxOf(clip.sfx || 'pop');
+  mixer.play({ key: 'film:' + i + ':' + Math.round(at * 10), at, samples, sampleRate: line ? TALK_SR : 44100, gain: (clip.gain ?? 1) * (line ? 0.55 : 0.6) }, offset, !CAPTURE, bts.playing);
 }
-function hush(): void { talkNodes.forEach((n) => { try { n.stop(); } catch { /* done */ } }); talkNodes = []; }
 function updateTalks(): void {
-  if (talkNodes.length && !bts.playing) hush();
+  if (wasPlaying && !bts.playing) mixer.hush(); wasPlaying = bts.playing;
   talks.forEach((k, a) => {
     const t = bts.songT - k.start;
     if (t < 0 || t > k.len + 0.25) { talks.delete(a); if (voice.target !== a) a.lips = null; return; }
@@ -103,7 +105,7 @@ function reset(): void {
     lead: 'max', selected: 'max'
   };
   castOnly('max', ST.actor); K.tune = {};
-  talks.clear(); hush(); if (voice.active) voice.attach(ST.actor);
+  talks.clear(); mixer.hush(); if (voice.active) voice.attach(ST.actor);
   film = null; editor = null; $('#timeline').innerHTML = ''; $('#pointer').style.display = 'none';
   $('#panel').classList.remove('on'); setMode('single');
 }
@@ -155,8 +157,14 @@ const CMD: Record<string, Command> = {
     const a = actorFor(ev), len = K.clamp(Number(o.len ?? 2) || 2, 0.1, 30);
     const samples = babble({ seconds: len, sampleRate: TALK_SR, pitch: pitchOf(a.who) * (Number(o.pitch) || 1), seed: o.seed ?? (ev.i ?? 0) + 1, vowels: o.vowels });
     talks.set(a, { start: ctx.now - ctx.since, len, track: lipTrack(samples, TALK_SR, TALK_FPS) });
-    if (!ctx.instant && beat.on && !CAPTURE) sayOutLoud(samples, ctx.since);
+    mixer.play({ key: 'talk:' + ev.i, at: ctx.now - ctx.since, samples, sampleRate: TALK_SR, gain: 0.55 }, ctx.since, !ctx.instant && !CAPTURE);
     src('voice');
+  },
+  sfx(v, ev, ctx) {
+    const name = str(v);
+    if (ST.mode === 'film' && ST.editRow === 'sound' && editor) { editor.assign(name); markPicker(name); }
+    mixer.play({ key: 'sfx:' + ev.i, at: ctx.now - ctx.since, samples: sfxOf(name), sampleRate: 44100, gain: 0.6 }, ctx.since, !ctx.instant && !CAPTURE);
+    src('sound', name);
   },
   manner(v, ev) { actorFor(ev).setManner((v || {}) as Partial<Manner>); stage.dirty = true; if (ST.panel === 'Motion' && !ST.instant) openPanel('Motion'); src('manner'); },
   style(v, ev) {
@@ -188,7 +196,7 @@ const CMD: Record<string, Command> = {
   sheet(v, ev) { ST.sheetKind = str(v); ST.grid = num(ev.grid) || 3; setMode('sheet'); src('sheet'); },
   grid(v) { ST.grid = num(v); setMode(ST.mode === 'deal' ? 'deal' : 'sheet'); },
   deal(v) { ST.dealSeed = num(v); setMode('deal'); src('deal'); },
-  edit(v) { const f = needFilm(); ST.editRow = /style/i.test(str(v)) ? 'style' : 'who'; f.playing = false; ST.multicam = false; f.camOverride = null; setMode('film'); editor!.select(ST.editRow); src('film'); },
+  edit(v) { const f = needFilm(); ST.editRow = /style/i.test(str(v)) ? 'style' : /sound/i.test(str(v)) ? 'sound' : 'who'; f.playing = false; ST.multicam = false; f.camOverride = null; setMode('film'); editor!.select(ST.editRow); if (ST.editRow === 'sound') buildPicker('sound'); src('film'); },
   set(v, ev) { leaveSpecial(); if (ST.panel !== 'Design') openPanel('Design'); actorFor(ev).set(str(v), num(ev.to)); bump(); markPanel('dial', str(v)); src('set', str(v)); },
   preset(v, ev) { leaveSpecial(); if (ST.panel !== 'Design') openPanel('Design'); actorFor(ev).cast(str(v)); bump(); markPanel('cast', str(v)); src('who', str(v)); },
   play(_v, ev, ctx) {
@@ -299,8 +307,8 @@ function buildAspects(W: number, H: number): void {
 // ── film ─────────────────────────────────────────────────────────────────
 function ensureFilm(): void {
   if (film) return;
-  film = new Player(structuredClone(filmData), { skins: SKINS });
-  editor = new Editor($('#timeline'), film, { onPick: (row) => buildPicker(row), onAspect: layoutFilm, onChange: () => { src('film'); saveDraftSoon(); } });
+  film = new Player(structuredClone(filmData), { skins: SKINS, onSound: filmSound });
+  editor = new Editor($('#timeline'), film, { onPick: (row) => buildPicker(row), onAspect: layoutFilm, onChange: () => { mixer.log.forEach((_c, k) => { if (k.indexOf('film:') === 0) mixer.log.delete(k); }); src('film'); saveDraftSoon(); } });
 }
 const ASPECT: Record<string, number> = { wide: 16 / 9, tall: 9 / 16, square: 1, portrait: 0.8 };
 function layoutFilm(): void {
@@ -319,9 +327,21 @@ function layoutFilm(): void {
   markCams();
 }
 function markCams(): void { Array.from($('#multicam').children).forEach((f, i) => { f.classList.toggle('on', !!film && film.camOverride === i); }); }
-function buildPicker(row: TrackName | null): void {
+function buildPicker(row: EditRow | null): void {
   if (!editor) return; const ed = editor, host = ed.picker; host.innerHTML = '';
   if (!row) return;
+  if (row === 'sound') {
+    // effects and a spoken line; clicking one also plays it
+    const sel = ed.sel && ed.sel.row === 'sound' ? (film!.film.tracks.sound || [])[ed.sel.i] : undefined;
+    const add = el('button', 'tl-btn snd-add', '+ Add a sound at the playhead'); add.onclick = () => { ed.addSound({ sfx: 'pop' }); preview({ at: 0, sfx: 'pop' }); }; host.appendChild(add);
+    [...SFX, 'line'].forEach((k) => {
+      const b = el('button', 'tl-btn snd' + (sel && (k === 'line' ? sel.say != null : sel.sfx === k) ? ' on' : ''), k === 'line' ? 'Spoken line' : SFX_LABEL[k as keyof typeof SFX_LABEL]); b.dataset.k = k;
+      b.onclick = () => { if (!ed.sel || ed.sel.row !== 'sound') ed.addSound(); ed.assign(k); markPicker(k); const c = (film!.film.tracks.sound || [])[ed.sel!.i]; if (c) preview(c); };
+      host.appendChild(b);
+    });
+    if (sel) { const del = el('button', 'tl-btn snd-del', 'Delete'); del.onclick = () => { ed.removeSound(); buildPicker('sound'); }; host.appendChild(del); }
+    return;
+  }
   const list = row === 'who' ? CAST_ORDER : STYLE_ORDER;
   list.forEach((k) => {
     const f = el('figure'), c = el('canvas'); c.width = 192; c.height = 160; f.appendChild(c);
@@ -329,6 +349,10 @@ function buildPicker(row: TrackName | null): void {
     f.onclick = () => { ed.assign(k); markPicker(k); }; host.appendChild(f);
     queueThumb(c, row === 'who' ? { who: k, style: 'pencil', pose: 'rest' } : { design: film!.actor.designTo, who: film!.who, style: k, pose: 'rest' });
   });
+}
+function preview(c: SoundClip): void {
+  const line = c.say != null;
+  mixer.play({ key: 'preview', at: 0, samples: line ? clipSamples(c, film ? film.whoAt(c.at) : 'max', TALK_SR) : sfxOf(c.sfx || 'pop'), sampleRate: line ? TALK_SR : 44100, gain: 0.6 }, 0, !CAPTURE, false);
 }
 function markPicker(k: string): void {
   if (!editor) return;
@@ -561,7 +585,7 @@ const KNOWN: Record<string, Set<string>> = {
   pose: new Set(Object.keys(POSES)), style: new Set(Object.keys(SKINS)),
   who: new Set(Object.keys(CAST)), preset: new Set(Object.keys(CAST)), create: new Set(Object.keys(CAST)),
   set: new Set(DESIGN.map((r) => r[0])), open: new Set(['Styles', 'Tune', 'Poses', 'Design', 'Motion', 'Voice']),
-  edit: new Set(['Who plays it', 'Style']), shot: new Set(['wide', 'full', 'medium', 'close'])
+  edit: new Set(['Who plays it', 'Style', 'Sound']), sfx: new Set<string>(SFX), shot: new Set(['wide', 'full', 'medium', 'close'])
 };
 const PALETTES = new Set((skin('hologram').palettes || []).map((p) => p.name));
 /** Things that parse but won't do what the author meant: shown as warnings, the score still plays. */
@@ -610,7 +634,7 @@ function applyScore(): void {
   marks = validate(r.score.events, r.lines);
   scoreLineOf = r.lines;
   const bpm = r.score.bpm || 92; beat.bpm = bpm;
-  bts.load(r.score.events, { bpm, tail: r.score.tail ?? 3.2 });
+  mixer.clear(); bts.load(r.score.events, { bpm, tail: r.score.tail ?? 3.2 });
   $<HTMLInputElement>('#scrub').max = String(bts.total);
   renderScore();
   saveDraftSoon();
@@ -726,13 +750,14 @@ function showSource(kind: string, name?: string): void {
   if (kind === 'style') { const s = skin(n), f = SKIN_FILE[s.group]!; file = LIB + 'skins/' + f[0] + '.ts'; view = fileAt(f[1], 'Skins.' + s.name + ' = {'); }
   else if (kind === 'pose') { file = LIB + 'rig.ts'; view = fileAt(rigSrc, n.indexOf('feel-') === 0 ? "feel('" + n.slice(5) + "'" : "'" + n + "'"); }
   else if (kind === 'who') { file = LIB + 'design.ts'; view = fileAt(designSrc, "cast('" + n + "'"); }
+  else if (kind === 'sound') { file = LIB + 'sound/sfx.ts'; view = fileAt(sfxSrc, "case '" + n + "'"); }
   else if (kind === 'voice') { file = LIB + 'voice/analyze.ts'; view = fileAt(voiceSrc, 'export function analyze'); }
   else if (kind === 'manner') { file = LIB + 'design.ts'; view = fileAt(designSrc, 'const MANNERS'); }
   else if (kind === 'set') { file = LIB + 'design.ts'; view = fileAt(designSrc, "['" + n + "'"); }
   else if (kind === 'film') {
     // the live film, so edits made in the timeline show up here
     file = 'apps/studio/src/hello.ts'; const lines = ('export default ' + lit(film ? film.film : hello).join('\n') + ';').split('\n');
-    const want = ST.editRow ? (ST.editRow === 'who' ? 'who:' : 'style:') : (ST.multicam ? 'cameras:' : 'shots:');
+    const want = ST.editRow ? ST.editRow + ':' : (ST.multicam ? 'cameras:' : 'shots:');
     view = { lines, hi: Math.max(0, lines.findIndex((l) => l.trim().indexOf(want) === 0)) };
   }
   else if (kind === 'create') { file = LIB + 'rig.ts'; view = fileAt(rigSrc, 'export class Actor'); }
@@ -837,7 +862,7 @@ if (!tour.ok) throw new Error('tour.score line ' + tour.error.line + ': ' + tour
 const BPM = tour.score.bpm || 92, beat = new Beat(BPM);
 scoreLineOf = tour.lines;
 const beatClock = { start: (t: number) => { beat.start(t); }, stop: () => beat.stop(), now: () => beat.now(), get running() { return beat.running; } };
-function setSound(on: boolean): void { beat.on = on; bts.setClock(on ? beatClock : null); }
+function setSound(on: boolean): void { beat.on = on; mixer.on = on; if (!on) mixer.hush(); bts.setClock(on ? beatClock : null); }
 bts = createConductor({
   bpm: BPM, events: tour.score.events, tail: tour.score.tail ?? 3.2, onCommand: exec, onReset: reset, onSettle: settle, commandsOf
 });
@@ -855,6 +880,8 @@ declare global { interface Window { Studio: unknown } }
 window.Studio = {
   exec, step, openPanel, setMode, conductor: bts, stage, voice,
   renderBeatWav: (sec: number) => Beat.render(bts.bpm, sec).then(Beat.wav64),
+  /** The beat plus every logged cue (lines, effects, the film's sound track) as one WAV. */
+  renderSoundWav: (sec: number) => Beat.render(bts.bpm, sec).then((b) => mixer.render(b)), mixer,
   project: () => currentProject(), loadProject, shareCode: () => encodeShare(currentProject()),
   setScore: (text: string) => { const ta = edTa(); ta.value = text; ta.dispatchEvent(new Event('input')); clearTimeout(applyTimer); applyScore(); },
   get state() { return ST; }, get film() { return film; }
