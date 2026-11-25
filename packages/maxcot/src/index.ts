@@ -13,6 +13,7 @@ export type { CastMember, DesignRow, Manner, IdleHabit, GazeHabit } from './desi
 export { K as kit } from './kit.js';
 export type { Kit, ToonStyle, LineFn, SketchOptions, HatchOptions, HalftoneOptions, Palette as FillPalette } from './kit.js';
 export type * from './types.js';
+export { Fx, applyFx, gpuAvailable, type FxMode, type FxOptions } from './gpu/fx.js';
 
 /** Supply canvases yourself: OffscreenCanvas in a worker, skia-canvas or @napi-rs/canvas in Node. */
 export const setCanvasFactory = K.setCanvasFactory;

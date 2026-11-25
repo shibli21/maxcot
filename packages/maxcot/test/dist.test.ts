@@ -12,7 +12,7 @@ describe('dist', () => {
     const puppet = await import('../dist/puppet/index.js');
     expect(typeof core.createCharacter).toBe('function');
     expect(typeof core.Character).toBe('function');
-    expect(skins.allSkins).toHaveLength(42);
+    expect(skins.allSkins).toHaveLength(43);
     expect(typeof film.Player).toBe('function');
     expect(new score.Conductor({ bpm: 60 }).timeOf([2, 1])).toBe(4);
     expect(typeof voice.Voice).toBe('function');

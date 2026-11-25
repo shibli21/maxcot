@@ -25,7 +25,7 @@ const Skins: Record<string, Skin> = {};
   // ── glitch: RGB split and torn scan slices ───────────────────────────────
   Skins.glitch = {
     name: 'glitch', label: 'Glitch', group: 'signal', about: 'A dropped signal: channels split, scan lines tear sideways.',
-    fps: 12, hold: 'skin', ground: { css: '#f2f1ea', draw: paper }, params: [['glitch.amount', 'Damage', 0, 2, 1]],
+    fps: 12, hold: 'skin', ground: { css: '#f2f1ea', draw: paper }, params: [['glitch.amount', 'Damage', 0, 2, 1]], gpu: [{ type: 'glitch', amount: 0.35 }],
     draw: function (S: Scene, ctx: Ctx2D, view: View) {
       var src = inner(S, view, tv('glitch.base', 'sketch'), 'g0', true), rnd = K.rng(S.seed * 97 + 1), u = S.unit, amt = tv('glitch.amount', 1);
       var sh = u * 0.025 * amt * (0.4 + rnd());

@@ -4,6 +4,7 @@
 // and the face is mapped onto the front plane. The door split doubles as the
 // mouth line. Skins never see 3D, only the flat Scene:
 //   S.parts[] = { role, pts, fill, shade, edge, line, lw, group, clip, seam }
+import { applyFx } from './gpu/fx.js';
 import K from './kit.js';
 import { Actor } from './rig.js';
 import type { Camera, CanvasLike, Ctx2D, DesignValues, Frame, Framing, MeshLine, Part, Pt, Scene, Skin } from './types.js';
@@ -500,6 +501,7 @@ export interface SceneView { w: number; h: number; cam: Camera; guides?: boolean
       ctx.restore();
     }
     ctx.save(); skin.draw(S, ctx, view); ctx.restore();
+    if (skin.gpu) applyFx(ctx, skin.gpu, { t: o.t, key: S.key, seed: S.seed });
     return S;
   }
 

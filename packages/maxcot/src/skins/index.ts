@@ -9,7 +9,7 @@ export * from './cartoon.js';
 export * from './pixels.js';
 import { pencil, sketch, ballpoint, felttip, inkbleed, inkpunch, gloss } from './drawn.js';
 import { print, riso, gigposter, stencil, manga, cubist } from './print.js';
-import { hologram, wireframe, neon, oscilloscope, teletext, pixel } from './screens.js';
+import { hologram, wireframe, neon, oscilloscope, teletext, pixel, afterglow } from './screens.js';
 import { glitch, datamosh, databend, feedback, trails, pixelwind, stylemosh } from './glitch.js';
 import { maxcot, chalk, papercut, crayon } from './house.js';
 import { benday, silverage, noir, webcomic } from './comics.js';
@@ -25,7 +25,7 @@ export const GROUPS: Array<[SkinGroup, string]> = [['drawn', 'Drawn'], ['print',
 export const allSkins: Skin[] = [
   pencil, sketch, ballpoint, felttip, inkbleed, inkpunch, gloss,
   print, riso, gigposter, stencil, manga, cubist,
-  hologram, wireframe, neon, oscilloscope, teletext, pixel,
+  hologram, wireframe, neon, oscilloscope, teletext, pixel, afterglow,
   glitch, datamosh, databend, feedback,
   trails, pixelwind, stylemosh,
   maxcot, chalk, papercut, crayon,

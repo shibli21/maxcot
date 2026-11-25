@@ -90,6 +90,17 @@ export type SkinParam = [string, string, number, number, number];
 export interface Palette { name: string; label: string; value: string[] }
 
 /** A visual style. Draws a Scene; never sees 3D. */
+export type FxPass =
+  /** Bright parts glow: threshold (0..1), strength, radius (relative). */
+  | { type: 'bloom'; strength?: number; threshold?: number; radius?: number }
+  | { type: 'blur'; radius?: number }
+  /** The last frame lingers, zoomed and turned a little: amount 0..1. */
+  | { type: 'feedback'; amount?: number; zoom?: number; rotate?: number }
+  /** Torn horizontal bands and a split signal: amount 0..1. */
+  | { type: 'glitch'; amount?: number }
+  /** Red and blue pulled apart: amount in pixels at 1080p. */
+  | { type: 'chroma'; amount?: number };
+
 export interface Skin {
   name: string;
   label: string;
@@ -102,4 +113,6 @@ export interface Skin {
   params?: SkinParam[];
   palettes?: Palette[];
   draw(S: Scene, ctx: Ctx2D, view: View): void;
+  /** Opt in to the effects layer: these passes run on the GPU after the skin draws (Canvas 2D where there is no WebGL). */
+  gpu?: FxPass[];
 }

@@ -1,7 +1,7 @@
 {
   "name": "maxcot",
   "version": "0.1.0",
-  "description": "A character animation engine drawn entirely in code: one rig, 42 skins, a film player and a bars-and-beats sequencer.",
+  "description": "A character animation engine drawn entirely in code: one rig, 43 skins, a film player and a bars-and-beats sequencer.",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,

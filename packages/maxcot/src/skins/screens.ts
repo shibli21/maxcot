@@ -33,7 +33,7 @@ const Skins: Record<string, Skin> = {};
   }
   Skins.hologram = {
     name: 'hologram', label: 'Hologram', group: 'screens', about: 'A projected volume: scan lines, a lit grid and a base ring, in one of eight beams.',
-    fps: 24, hold: { redraw: true }, palettes: PALETTES,
+    fps: 24, hold: { redraw: true }, palettes: PALETTES, gpu: [{ type: 'bloom', threshold: 0.55, strength: 0.7 }, { type: 'chroma', amount: 2.5 }],
     ground: { css: '#03060c', draw: function (ctx: Ctx2D, w: number, h: number, t: number, K2: unknown, view: View) {
       var c = (PAL[view.palette!] || PALETTES[0]!).value, g = ctx.createRadialGradient(w / 2, h * 0.75, 10, w / 2, h * 0.6, Math.max(w, h) * 0.7);
       g.addColorStop(0, K.rgba(c[1], 0.35)); g.addColorStop(1, '#020408'); ctx.fillStyle = g; ctx.fillRect(0, 0, w, h); stars(ctx, w, h, 3);
@@ -88,7 +88,7 @@ const Skins: Record<string, Skin> = {};
   // ── neon: tubes on a brick wall ──────────────────────────────────────────
   Skins.neon = {
     name: 'neon', label: 'Neon', group: 'screens', about: 'Bent glass tubes on a back-alley brick wall. One of them flickers.',
-    fps: 24, hold: { redraw: true },
+    fps: 24, hold: { redraw: true }, gpu: [{ type: 'bloom', threshold: 0.45, strength: 1.1, radius: 1.2 }],
     ground: { css: '#120c1c', draw: function (ctx: Ctx2D, w: number, h: number) {
       ctx.fillStyle = '#140d1f'; ctx.fillRect(0, 0, w, h); var bh = Math.max(10, h / 18), bw = bh * 2.6;
       ctx.strokeStyle = 'rgba(255,255,255,0.05)'; ctx.lineWidth = 1;
@@ -111,7 +111,7 @@ const Skins: Record<string, Skin> = {};
   // ── oscilloscope: one beam, phosphor persistence ─────────────────────────
   Skins.oscilloscope = {
     name: 'oscilloscope', label: 'Oscilloscope', group: 'screens', about: 'A single green beam tracing the outline, with phosphor afterglow.',
-    fps: 30, hold: { redraw: true },
+    fps: 30, hold: { redraw: true }, gpu: [{ type: 'bloom', threshold: 0.3, strength: 0.9, radius: 0.8 }],
     ground: { css: '#020a04', draw: function (ctx: Ctx2D, w: number, h: number) { ctx.fillStyle = '#020a04'; ctx.fillRect(0, 0, w, h); } },
     draw: function (S: Scene, ctx: Ctx2D, view: View) {
       var buf = bufferOf(S, 'scope'), c = buf.ctx, u = S.unit, t = view.t;
@@ -184,4 +184,20 @@ export const neon: Skin = Skins.neon!;
 export const oscilloscope: Skin = Skins.oscilloscope!;
 export const teletext: Skin = Skins.teletext!;
 export const pixel: Skin = Skins.pixel!;
+
+// ── afterglow: a GPU skin. Light trails that linger, drift and glow ─────────
+Skins.afterglow = {
+  name: 'afterglow', label: 'Afterglow', group: 'screens', about: 'Lines of light that linger: every frame fades into the next, drifting outward and blooming.',
+  fps: 30, hold: { redraw: true },
+  gpu: [{ type: 'feedback', amount: 0.88, zoom: 1.012, rotate: 0.004 }, { type: 'bloom', threshold: 0.35, strength: 1.2, radius: 1 }],
+  ground: { css: '#07060f', draw: function (ctx: Ctx2D, w: number, h: number) { ctx.fillStyle = '#07060f'; ctx.fillRect(0, 0, w, h); } },
+  draw: function (S: Scene, ctx: Ctx2D, view: View) {
+    var u = S.unit, hue = (view.t * 40) % 360;
+    ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.lineJoin = ctx.lineCap = 'round';
+    ctx.strokeStyle = 'hsl(' + hue.toFixed(0) + ',90%,62%)'; ctx.lineWidth = u * 0.01; strokeAll(ctx, S);
+    ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = u * 0.003; strokeAll(ctx, S);
+    ctx.restore();
+  }
+};
+export const afterglow: Skin = Skins.afterglow!;
 

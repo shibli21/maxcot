@@ -1,6 +1,6 @@
 # maxcot
 
-A character animation engine drawn entirely in code: one rig, 8 actors, 42 visual
+A character animation engine drawn entirely in code: one rig, 8 actors, 43 visual
 skins, a film player and a bars-and-beats sequencer. No images, no sprites. Every
 line, hatch and halftone dot is generated on a 2D canvas, in the browser or in Node.
 
@@ -13,7 +13,7 @@ Strict TypeScript, ES modules, zero runtime dependencies. Seven entry points:
 | Import | What it gives you |
 |---|---|
 | `maxcot` | `createCharacter`, `createStage`, `Actor`, `render`, `scene`, poses, the design table, the cast |
-| `maxcot/skins` | the 42 skins as plain objects, plus `allSkins` and `skinsByName` |
+| `maxcot/skins` | the 43 skins as plain objects, plus `allSkins` and `skinsByName` |
 | `maxcot/film` | `Player` (shots, beats, who/style tracks, cameras), a DOM timeline `Editor`, `card` |
 | `maxcot/score` | `createConductor`: sequence anything in bars and beats, with exact seeking |
 | `maxcot/voice` | lip-sync from sound: a live `Voice` (microphone or file), offline `lipTrack`, a `babble` test voice |
@@ -211,7 +211,7 @@ render(canvas.getContext('2d') as unknown as Ctx2D, 800, 600, boss.frame(1), { s
 writeFileSync('boss.png', canvas.toBuffer('image/png'));
 ```
 
-All 42 skins are tested this way with `@napi-rs/canvas`. In a Web Worker, OffscreenCanvas is used automatically.
+All 43 skins are tested this way with `@napi-rs/canvas`. In a Web Worker, OffscreenCanvas is used automatically.
 
 ## Writing a skin
 
@@ -238,6 +238,17 @@ export const blueprint: Skin = {
 `ToonStyle` also takes `line` (draw your own strokes), `texture` (hatching, halftones),
 `pre`, `skip` and `noLines`. The `kit` has the building blocks the built-in skins use:
 `sketch`, `hatch`, `halftone`, `brush`, `wobble`, `paper`, seeded `rng` and `noise`.
+
+A skin can opt in to the **effects layer** with `gpu`: after it draws, the frame goes through
+those passes on the GPU (WebGL), or through a Canvas 2D stand-in where there is no WebGL
+(Node, some workers). Passes are `bloom`, `blur`, `feedback`, `glitch` and `chroma`:
+
+```ts
+export const glowprint: Skin = { ...blueprint, name: 'glowprint', gpu: [{ type: 'bloom', threshold: 0.5, strength: 1.2 }] };
+```
+
+`Fx.enabled = false` switches the layer off everywhere; `Fx.last` says how the last frame ran
+(`'gpu'`, `'2d'` or `'off'`).
 
 ## License
 

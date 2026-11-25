@@ -2,7 +2,7 @@
 // the side panel (Styles, Tune, Poses, Design, Motion), the two code panes and
 // the transport. Every score command lands in CMD below; the UI calls the same
 // functions, so anything the score can do, a person can do by hand.
-import { kit as K, Actor, Character, Stage, CAST, DESIGN, POSES, POSE_SECTIONS, render, type DesignRow, type DesignValues, type Manner, type Skin, type StageFraming } from 'maxcot';
+import { Fx, gpuAvailable, kit as K, Actor, Character, Stage, CAST, DESIGN, POSES, POSE_SECTIONS, render, type DesignRow, type DesignValues, type Manner, type Skin, type StageFraming } from 'maxcot';
 import { GROUPS, allSkins, skinsByName } from 'maxcot/skins';
 import { Editor, Player, card, type EditRow, type Film, type SoundClip, type StyleSegment, type WhoSegment } from 'maxcot/film';
 import { SFX, SFX_LABEL, clipSamples, sfx as sfxSamples } from 'maxcot/sound';
@@ -481,6 +481,11 @@ function buildPanel(): void {
     const sk = skin(ST.style); body.appendChild(el('h4', null, sk.label)); body.appendChild(el('p', 'note', sk.about));
     (sk.params || []).forEach((p) => { dial(body, 'tune:' + p[0], p[1], p[2], p[3], Number(K.tv(p[0], p[4])), '', (v) => { K.tune[p[0]] = v; stage.dirty = true; }); });
     if (!(sk.params || []).length) body.appendChild(el('p', 'note', 'This skin has no dials of its own.'));
+    if (sk.gpu) {
+      body.appendChild(el('h4', null, 'Effects layer'));
+      body.appendChild(el('p', 'note', 'This skin runs ' + sk.gpu.map((p) => p.type).join(', ') + ' after it draws. ' + (gpuAvailable() ? 'Here that happens on the GPU (WebGL).' : 'There is no WebGL here, so a Canvas 2D version stands in.')));
+      toggle(body, 'GPU effects', Fx.enabled, (on) => { Fx.enabled = on; stage.dirty = true; tiles.forEach((x) => { x.h.dirty = true; }); });
+    }
     if (sk.palettes) {
       body.appendChild(el('h4', null, 'Beam')); const pc = el('div', 'chips'); body.appendChild(pc);
       sk.palettes.forEach((p) => { const ch = el('div', 'chip' + (p.name === ST.palette ? ' on' : ''), p.label); ch.style.padding = '4px 8px'; ch.onclick = () => { exec('style', ST.style, { palette: p.name }); openPanel('Tune'); }; pc.appendChild(ch); });
@@ -1026,7 +1031,7 @@ if (!CAPTURE) requestAnimationFrame(loop);
 
 declare global { interface Window { Studio: unknown } }
 window.Studio = {
-  exec, step, openPanel, setMode, conductor: bts, stage, voice, puppet, startPuppet, exportVideo: runExport, openExport,
+  exec, step, openPanel, setMode, conductor: bts, stage, voice, puppet, fx: Fx, startPuppet, exportVideo: runExport, openExport,
   renderBeatWav: (sec: number) => Beat.render(bts.bpm, sec).then(Beat.wav64),
   /** The beat plus every logged cue (lines, effects, the film's sound track) as one WAV. */
   renderSoundWav: (sec: number) => Beat.render(bts.bpm, sec).then((b) => mixer.render(b)), mixer,
