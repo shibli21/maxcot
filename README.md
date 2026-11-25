@@ -102,6 +102,10 @@ zap, blip, slide, tada, crash), all synthesised in code. The film has its own **
 timeline (`edit: 'Sound'`) with effects and spoken lines you can drag, swap, add and delete
 (**Demos → Sound check**). A recorded video carries all of it: the beat, every line and every effect.
 
+The **Puppet** tab lets you play the selected actor live: the mouse steers where they look, holding
+the button makes them talk, keys 1-9 strike poses (W hops, A and D step), and a gamepad works too.
+Tick **Record** and press play: the poses you strike are written into the score at the beats you hit.
+
 Each verb (`create`, `enter`, `exit`, `shot`, `look`, `style`, `pose`, `who`, `set`, `talk`, `sfx`, `play`, `camera`, `end` and the rest) is
 one function in the studio's `CMD` table, and the UI calls the same functions, so anything
 the score can do, you can do by hand.

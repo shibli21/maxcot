@@ -167,3 +167,6 @@ button { font: inherit; }
 #exportDlg .xbtns button { border: 1px solid #cfcdc4; background: #fff; padding: 6px 14px; cursor: pointer; }
 #exportDlg .xbtns .go { background: #111; color: #fff; border-color: #111; }
 #exportDlg .xbtns .go:disabled { opacity: 0.5; cursor: default; }
+#panelBody ul.keys { list-style: none; padding: 0; margin: 4px 0 8px; font-size: 12px; }
+#panelBody ul.keys li { display: grid; grid-template-columns: 120px 1fr; gap: 8px; line-height: 1.35; margin: 4px 0; }
+#panelBody ul.keys b { font-weight: 600; }

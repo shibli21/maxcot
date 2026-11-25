@@ -29,6 +29,10 @@
     "./sound": {
       "types": "./dist/sound/index.d.ts",
       "default": "./dist/sound/index.js"
+    },
+    "./puppet": {
+      "types": "./dist/puppet/index.d.ts",
+      "default": "./dist/puppet/index.js"
     }
   },
   "files": [

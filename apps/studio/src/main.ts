@@ -8,6 +8,7 @@ import { Editor, Player, card, type EditRow, type Film, type SoundClip, type Sty
 import { SFX, SFX_LABEL, clipSamples, sfx as sfxSamples } from 'maxcot/sound';
 import { createConductor, parseScore, type CommandContext, type Conductor, type ScheduledEvent, type ScoreEvent } from 'maxcot/score';
 import { Voice, babble, lipTrack, lipsAt, pitchOf, type Lips } from 'maxcot/voice';
+import { Puppet } from 'maxcot/puppet';
 import hello from './hello';
 import Beat from './beat';
 import Mixer from './mixer';
@@ -35,7 +36,7 @@ import mainSrc from './main.ts?raw';
 const tourScore = tourScoreRaw.replace(/\r\n?/g, '\n');
 
 type Mode = 'single' | 'sizes' | 'sheet' | 'deal' | 'faces' | 'aspects' | 'film' | 'card';
-type Panel = 'Styles' | 'Tune' | 'Poses' | 'Design' | 'Motion' | 'Voice';
+type Panel = 'Styles' | 'Tune' | 'Poses' | 'Design' | 'Motion' | 'Voice' | 'Puppet';
 interface StudioState {
   actor: Actor; style: string; palette: string; guides: boolean; mode: Mode;
   sizesUpTo: number; grid: number; sheetKind: string; dealSeed: number; faces: number;
@@ -79,6 +80,31 @@ const voice = new Voice();
 const TALK_SR = 22050, TALK_FPS = 60;
 interface Talk { start: number; len: number; track: Lips[] }
 const talks = new Map<Actor, Talk>();
+// a puppet: the mouse, the keys and a gamepad play the selected actor live
+const puppet = new Puppet();
+let recordTakes = false, takes: Array<{ t: number; pose: string; on: string }> = [];
+puppet.onStep = (d) => { const m = stage.members.find((x) => x.id === ST.selected); if (m) { stage.place(m.id, K.clamp(m.x + d * 0.5, -3, 3)); stage.dirty = true; } };
+puppet.onPose = (name) => { stage.dirty = true; if (recordTakes && bts.playing) takes.push({ t: bts.songT, pose: name, on: ST.selected }); };
+function startPuppet(on: boolean): void {
+  if (on) { puppet.attach(ST.actor).bind($('#main')); toast('Puppet on: move the mouse over the stage, hold the button to talk, keys 1-9 for poses'); }
+  else { flushTakes(); puppet.unbind(); }
+  if (ST.panel === 'Puppet') buildPanel();
+}
+/** Write the poses recorded during a take into the score, at the beats they were struck on. */
+function flushTakes(): void {
+  if (!takes.length) return;
+  const lines = takes.map((k) => {
+    const bb = bts.barBeat(k.t), beat = Math.round(bb[1] * 4) / 4;
+    return '    { at: [' + bb[0] + ', ' + beat + '], pose: ' + "'" + k.pose + "'" + (k.on !== ST.lead ? ", on: '" + k.on + "'" : '') + ' },';
+  });
+  const n = takes.length; takes = [];
+  const text = scoreText, close = text.lastIndexOf(']'); if (close < 0) return;
+  let before = text.slice(0, close).replace(/\s+$/, '');
+  if (before.endsWith('}')) before += ',';
+  const out = before + '\n    // recorded with the puppet\n' + lines.join('\n').replace(/,$/, '') + '\n  ' + text.slice(close);
+  const ta = edTa(); ta.value = out; scoreText = ta.value; pending = false; clearTimeout(applyTimer); applyScore();
+  toast('Recorded ' + n + (n === 1 ? ' pose' : ' poses') + ' into the score');
+}
 // every sound besides the beat goes through the mixer, which also logs it for export
 const mixer = new Mixer();
 let wasPlaying = false;
@@ -112,7 +138,7 @@ function reset(): void {
     lead: 'max', selected: 'max'
   };
   castOnly('max', ST.actor); K.tune = {};
-  talks.clear(); mixer.hush(); if (voice.active) voice.attach(ST.actor);
+  talks.clear(); mixer.hush(); if (voice.active) voice.attach(ST.actor); if (puppet.bound) puppet.attach(ST.actor);
   film = null; editor = null; $('#timeline').innerHTML = ''; $('#pointer').style.display = 'none';
   $('#panel').classList.remove('on'); setMode('single');
 }
@@ -140,6 +166,7 @@ function selectActor(id: string): void {
   if (!stage.has(id)) return;
   ST.selected = id; ST.actor = stage.get(id); bump();
   if (voice.active) voice.attach(ST.actor);
+  if (puppet.bound) puppet.attach(ST.actor);
   if (ST.panel) openPanel(ST.panel);
 }
 
@@ -375,7 +402,7 @@ function renderThumb(c: HTMLCanvasElement, s: ThumbSpec): void {
 }
 
 // ── panel ────────────────────────────────────────────────────────────────
-const TABS: Panel[] = ['Styles', 'Tune', 'Poses', 'Design', 'Motion', 'Voice'];
+const TABS: Panel[] = ['Styles', 'Tune', 'Poses', 'Design', 'Motion', 'Voice', 'Puppet'];
 function openPanel(name: Panel): void {
   ST.panel = name; $('#panel').classList.toggle('on', ST.mode === 'single');
   const tabs = $('#tabs'); tabs.innerHTML = '';
@@ -399,6 +426,11 @@ async function startVoice(kind: 'microphone' | 'test' | 'file', f?: File): Promi
   if (ST.panel === 'Voice') buildPanel();
 }
 voice.onended = () => { if (ST.panel === 'Voice') buildPanel(); };
+let padShown: string | null = null;
+function updatePadStatus(): void {
+  if (ST.panel !== 'Puppet' || puppet.gamepad === padShown) return; padShown = puppet.gamepad;
+  const s = document.querySelector('#panelBody .padStatus'); if (s) s.textContent = padShown ? 'Gamepad: ' + padShown : 'No gamepad yet (press a button on one to wake it).';
+}
 function updateMeter(): void {
   if (ST.panel !== 'Voice') return;
   const bar = document.querySelector<HTMLElement>('#panelBody .meter i'); if (bar) bar.style.width = Math.round(voice.lips.level * 100) + '%';
@@ -470,6 +502,23 @@ function buildPanel(): void {
     dial(body, 'm:damp', 'Damping', 0.2, 1.2, a.damp, '', (v) => { a.damp = v; });
     dial(body, 'm:idle', 'Idle life', 0, 2, a.idle, '', (v) => { a.idle = v; });
     dial(body, 'm:morph', 'Recast speed', 1, 20, a.morph, '', (v) => { a.morph = v; });
+  } else if (ST.panel === 'Puppet') {
+    body.appendChild(el('h4', null, 'Puppet ' + ST.selected));
+    body.appendChild(el('p', 'note', 'Play the selected actor live. Click another actor on stage to play them instead.'));
+    const row = el('div', 'vbtns'), go = el('button', puppet.bound ? 'on' : '', puppet.bound ? 'Stop' : 'Start'); go.dataset.k = 'puppet:go';
+    go.onclick = () => startPuppet(!puppet.bound); row.appendChild(go); body.appendChild(row);
+    const keys = el('ul', 'keys');
+    [['Mouse over the stage', 'where they look and lean'], ['Hold the mouse button or M', 'talk'], ['1 to 9', 'strike a pose from the bank below'], ['0', 'back to rest'],
+      ['W', 'hop'], ['S', 'squash'], ['A and D', 'step left and right'], ['Gamepad', 'sticks look and move the hands, triggers talk and squash, A B X Y strike poses 1 to 4']]
+      .forEach(([k, v]) => { const li = el('li'); li.appendChild(el('b', null, k!)); li.appendChild(document.createTextNode(' ' + v)); keys.appendChild(li); });
+    body.appendChild(keys);
+    body.appendChild(el('p', 'note padStatus', puppet.gamepad ? 'Gamepad: ' + puppet.gamepad : 'No gamepad yet (press a button on one to wake it).'));
+    body.appendChild(el('h4', null, 'Pose bank'));
+    const opts = POSE_SECTIONS.hands.concat(POSE_SECTIONS.attitudes, POSE_SECTIONS.feelings);
+    puppet.bank.forEach((p, i) => choice(body, 'pb:' + i, 'Key ' + (i + 1), opts, p, (v) => { puppet.bank[i] = v; }));
+    body.appendChild(el('h4', null, 'Record'));
+    toggle(body, 'Record poses into the score while it plays', recordTakes, (on) => { recordTakes = on; if (!on) flushTakes(); });
+    body.appendChild(el('p', 'note', 'Press play, then strike poses: when the score stops, each one is written into it at the beat you struck it on.'));
   } else if (ST.panel === 'Voice') {
     body.appendChild(el('h4', null, 'Lip-sync for ' + ST.selected));
     body.appendChild(el('p', 'note', 'The mouth follows the sound: loudness opens it, the vowel shapes it. The sound is read right here on the page; nothing is recorded or sent anywhere.'));
@@ -591,7 +640,7 @@ function nearest(word: string, names: Iterable<string>): string | null {
 const KNOWN: Record<string, Set<string>> = {
   pose: new Set(Object.keys(POSES)), style: new Set(Object.keys(SKINS)),
   who: new Set(Object.keys(CAST)), preset: new Set(Object.keys(CAST)), create: new Set(Object.keys(CAST)),
-  set: new Set(DESIGN.map((r) => r[0])), open: new Set(['Styles', 'Tune', 'Poses', 'Design', 'Motion', 'Voice']),
+  set: new Set(DESIGN.map((r) => r[0])), open: new Set(['Styles', 'Tune', 'Poses', 'Design', 'Motion', 'Voice', 'Puppet']),
   edit: new Set(['Who plays it', 'Style', 'Sound']), sfx: new Set<string>(SFX), shot: new Set(['wide', 'full', 'medium', 'close'])
 };
 const PALETTES = new Set((skin('hologram').palettes || []).map((p) => p.name));
@@ -840,6 +889,7 @@ function step(dt: number): void {
     bts.tick(dt);
     updateTalks();
     if (voice.active) voice.update(dt);
+    if (puppet.bound) { puppet.update(dt); stage.dirty = true; if (takes.length && !bts.playing) flushTakes(); updatePadStatus(); }
     stage.members.forEach((m) => m.actor.update(dt));
     if (!stage.members.some((m) => m.actor === ST.actor)) ST.actor.update(dt);
     updatePointer();
@@ -976,7 +1026,7 @@ if (!CAPTURE) requestAnimationFrame(loop);
 
 declare global { interface Window { Studio: unknown } }
 window.Studio = {
-  exec, step, openPanel, setMode, conductor: bts, stage, voice, exportVideo: runExport, openExport,
+  exec, step, openPanel, setMode, conductor: bts, stage, voice, puppet, startPuppet, exportVideo: runExport, openExport,
   renderBeatWav: (sec: number) => Beat.render(bts.bpm, sec).then(Beat.wav64),
   /** The beat plus every logged cue (lines, effects, the film's sound track) as one WAV. */
   renderSoundWav: (sec: number) => Beat.render(bts.bpm, sec).then((b) => mixer.render(b)), mixer,

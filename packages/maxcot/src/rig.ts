@@ -232,6 +232,8 @@ export class Actor {
   manner!: Manner;
   /** Lip-sync from sound (see maxcot/voice). While set and loud, it shapes the mouth over whatever pose is on. */
   lips: Lips | null = null;
+  /** Live offsets added to the channels each frame (a puppet's gaze, lean, open mouth...). */
+  offsets: Channels | null = null;
 
   constructor(o: ActorOptions = {}) {
     this.who = o.who || 'max';
@@ -325,6 +327,13 @@ export class Actor {
       C['mouth.wide'] = c('mouth.wide') + (L.wide - c('mouth.wide')) * sw;
       C['mouth.teeth'] = Math.max(c('mouth.teeth'), L.teeth);
       C.nod = c('nod') + L.level * 0.025 * Math.sin(t * 7);
+    }
+    // a puppeteer's hand on top of everything
+    var O = this.offsets;
+    if (O) {
+      for (var ok in O) C[ok] = (C[ok] || 0) + O[ok]!;
+      C['eyes.lookX'] = K.clamp(c('eyes.lookX'), -1, 1); C['eyes.lookY'] = K.clamp(c('eyes.lookY'), -1, 1);
+      C['mouth.open'] = K.clamp(c('mouth.open'), 0, 1.3);
     }
     return { P: P, C: C, D: this.disc, t: t, who: this.who };
   }

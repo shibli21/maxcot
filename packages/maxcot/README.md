@@ -8,7 +8,7 @@ line, hatch and halftone dot is generated on a 2D canvas, in the browser or in N
 npm install maxcot      # or: bun add maxcot
 ```
 
-Strict TypeScript, ES modules, zero runtime dependencies. Six entry points:
+Strict TypeScript, ES modules, zero runtime dependencies. Seven entry points:
 
 | Import | What it gives you |
 |---|---|
@@ -18,6 +18,7 @@ Strict TypeScript, ES modules, zero runtime dependencies. Six entry points:
 | `maxcot/score` | `createConductor`: sequence anything in bars and beats, with exact seeking |
 | `maxcot/voice` | lip-sync from sound: a live `Voice` (microphone or file), offline `lipTrack`, a `babble` test voice |
 | `maxcot/sound` | synthesised effects (`sfx`), spoken-line clips, and a mixer that writes WAV |
+| `maxcot/puppet` | play an actor live with a mouse, a keyboard or a gamepad |
 
 ## A character on a canvas
 
@@ -119,6 +120,24 @@ line (`{ at: 0.9, say: { len: 1.1, vowels: 'eoa' } }`). The `Player` moves the m
 plays the part while a line is spoken, and calls `onSound(clip, index, offset)` as playback reaches
 each clip so the host can play it (`clipSamples(clip, who)` gives the samples). The `Editor`
 shows a Sound row: drag clips along it, swap them, add or delete them.
+
+## Puppets
+
+`maxcot/puppet` plays an actor live. The pointer steers where it looks and leans, holding the
+button (or M) opens its mouth, number keys strike poses from a bank, W hops, S squashes, and a
+gamepad works too (sticks look and move the hands, triggers talk and squash, A B X Y strike poses).
+It writes `actor.offsets`, which sit on top of whatever pose the actor holds.
+
+```ts
+import { createPuppet } from 'maxcot/puppet';
+
+const puppet = createPuppet({ target: actor, bank: ['wave', 'thumbsup', 'shrug'] }).bind(canvas);
+puppet.onPose = (name) => console.log('struck', name);   // record a take
+function tick(dt: number) { puppet.update(dt); /* then draw */ }
+```
+
+The inputs are plain calls (`point(x, y)`, `button(down)`, `key(code, down)`, `pad(axes, buttons)`),
+so anything else (a MIDI controller, a face tracker) can drive a puppet as well.
 
 ## Sequencing with a score
 
